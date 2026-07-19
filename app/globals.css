@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Syne", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Manrope", ui-sans-serif, system-ui, sans-serif;
+
+  --color-ink: #0b1f2a;
+  --color-ink-soft: #243b48;
+  --color-mist: #eef3f6;
+  --color-fog: #d5e1e8;
+  --color-teal: #0f766e;
+  --color-teal-bright: #14b8a6;
+  --color-sand: #f7f1e8;
+  --color-line: color-mix(in oklab, var(--color-ink) 12%, transparent);
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, #cfe8e4 0%, transparent 55%),
+    radial-gradient(900px 500px at 90% 0%, #d4dff0 0%, transparent 50%),
+    linear-gradient(180deg, #f4f7f9 0%, #e8eef2 45%, #f7f1e8 100%);
+  background-attachment: fixed;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-teal-bright) 35%, white);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(12px, -10px, 0) scale(1.04);
+  }
+}
+
+@keyframes pulse-line {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+.animate-rise {
+  animation: rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-rise-delay {
+  animation: rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
+}
+
+.animate-rise-delay-2 {
+  animation: rise 1s cubic-bezier(0.22, 1, 0.36, 1) 0.24s both;
+}
+
+.orb {
+  animation: drift 14s ease-in-out infinite;
+}
+
+.orb-slow {
+  animation: drift 18s ease-in-out infinite reverse;
+}
+
+.scan-line {
+  animation: pulse-line 2.4s ease-in-out infinite;
+}
