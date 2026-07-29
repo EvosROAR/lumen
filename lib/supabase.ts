@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import ws from "ws";
 
 export function hasSupabase() {
   return Boolean(
@@ -26,6 +27,7 @@ export function getSupabase(): SupabaseClient {
   if (!cached) {
     cached = createClient(url, key, {
       auth: { persistSession: false, autoRefreshToken: false },
+      realtime: { transport: ws as unknown as typeof WebSocket },
     });
   }
   return cached;

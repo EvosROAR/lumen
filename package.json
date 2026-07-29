@@ -18,13 +18,15 @@
     "openai": "^4.104.0",
     "pdf-parse": "^2.4.5",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "ws": "^8.21.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.8",
     "@types/node": "^22.15.21",
     "@types/react": "^19.1.5",
     "@types/react-dom": "^19.1.5",
+    "@types/ws": "^8.18.1",
     "tailwindcss": "^4.1.8",
     "typescript": "^5.8.3"
   }

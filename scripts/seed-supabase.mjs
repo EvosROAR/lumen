@@ -7,6 +7,7 @@ import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import ws from "ws";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, "..");
@@ -27,6 +28,7 @@ const seed = JSON.parse(
 
 const supabase = createClient(url, key, {
   auth: { persistSession: false, autoRefreshToken: false },
+  realtime: { transport: ws },
 });
 
 async function main() {
