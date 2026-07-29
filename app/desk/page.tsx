@@ -16,6 +16,7 @@ type UiMessage = {
 type DocsResponse = {
   configured: boolean;
   demoMode?: boolean;
+  storage?: "supabase" | "file";
   documents: DocumentMeta[];
   chunkCount: number;
 };
@@ -26,6 +27,7 @@ export default function DeskPage() {
   const [chunkCount, setChunkCount] = useState(0);
   const [configured, setConfigured] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
+  const [storage, setStorage] = useState<"supabase" | "file">("file");
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -47,6 +49,7 @@ export default function DeskPage() {
     setChunkCount(data.chunkCount);
     setConfigured(data.configured);
     setDemoMode(Boolean(data.demoMode));
+    setStorage(data.storage === "supabase" ? "supabase" : "file");
   }, []);
 
   useEffect(() => {
@@ -338,6 +341,11 @@ ${mapList}`;
             {demoMode && (
               <span className="rounded-full bg-ink/5 px-2.5 py-1 font-medium text-ink-soft">
                 Demo read-only
+              </span>
+            )}
+            {!demoMode && storage === "supabase" && (
+              <span className="rounded-full bg-teal/15 px-2.5 py-1 font-medium text-teal">
+                Supabase
               </span>
             )}
             <span

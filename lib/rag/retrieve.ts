@@ -1,6 +1,6 @@
 import { bm25Scores, tokenizeText } from "@/lib/rag/bm25";
 import { cosineSimilarity, embedQuery, embedTexts } from "@/lib/rag/embed";
-import { isDemoMode, readStore, writeStore } from "@/lib/rag/store";
+import { isDemoMode, readStore, replaceChunkEmbeddings } from "@/lib/rag/store";
 import type { Citation, RetrievedChunk } from "@/lib/types";
 
 function normalizeMap(values: Map<string, number>): Map<string, number> {
@@ -35,8 +35,7 @@ export async function retrieve(
     }));
 
     if (!isDemoMode()) {
-      store.chunks = chunks;
-      await writeStore(store);
+      await replaceChunkEmbeddings(chunks);
     }
   }
 

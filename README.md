@@ -86,22 +86,23 @@ Buka:
 - Observability: latency, token cost, citation coverage
 - CI yang menjalankan `/api/eval` sebagai quality gate
 
-## Deploy (opsi A — demo read-only di Vercel)
+## Deploy with Supabase (upload aktif di production)
 
-Di Vercel, Lumen otomatis **demo mode**:
-- Materi dari `data/seed-store.json` (10 dokumen seed)
-- Chat, eval, rangkum **jalan**
-- Upload / hapus / muat contoh **dimatikan** (filesystem Vercel tidak persistent)
+Supabase **free tier** cukup untuk demo portofolio.
+
+1. Buat project gratis: [supabase.com](https://supabase.com)
+2. **SQL Editor** → jalankan isi `supabase/schema.sql`
+3. **Settings → API** → salin:
+   - Project URL → `SUPABASE_URL`
+   - `service_role` key → `SUPABASE_SERVICE_ROLE_KEY`
+4. Isi `.env.local` (lihat `.env.example`)
+5. Seed data contoh:
 
 ```bash
-npm run seed          # regenerate data/seed-store.json
-npx vercel            # atau hubungkan repo ke Vercel Dashboard
+npm install
+npm run seed:supabase
 ```
 
-Set environment di Vercel:
-- `GROQ_API_KEY`
-- `AI_CHAT_PROVIDER=groq`
-- `OPENAI_CHAT_MODEL=llama-3.1-8b-instant`
-- `EMBED_PROVIDER=local`
+6. Vercel → Project → Settings → Environment Variables → tambah `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` → Redeploy
 
-Local development tetap writable (kecuali `LUMEN_DEMO_MODE=true`).
+Setelah itu badge **Supabase** muncul di Desk, dan upload/hapus aktif di web live.
