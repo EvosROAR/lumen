@@ -1,7 +1,9 @@
 /**
- * Seed Supabase from data/seed-store.json
+ * Seed Supabase for ONE user (after auth schema migration).
  * Usage:
  *   node --env-file=.env.local scripts/seed-supabase.mjs
+ * Env:
+ *   SEED_USER_ID=<uuid from auth.users>
  */
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "fs";
@@ -12,13 +14,20 @@ import ws from "ws";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, "..");
 
-const url = process.env.SUPABASE_URL?.trim();
-const key =
-  process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
-  process.env.SUPABASE_ANON_KEY?.trim();
+const url =
+  process.env.SUPABASE_URL?.trim() ||
+  process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+const userId = process.env.SEED_USER_ID?.trim();
 
 if (!url || !key) {
   console.error("Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY first.");
+  process.exit(1);
+}
+if (!userId) {
+  console.error(
+    "Set SEED_USER_ID to a user uuid from Supabase Auth → Users (after you register).",
+  );
   process.exit(1);
 }
 
@@ -32,9 +41,9 @@ const supabase = createClient(url, key, {
 });
 
 async function main() {
-  console.log("Clearing existing Lumen tables...");
-  await supabase.from("lumen_chunks").delete().neq("id", "");
-  await supabase.from("lumen_documents").delete().neq("id", "");
+  console.log(`Clearing Lumen rows for user ${userId}...`);
+  await supabase.from("lumen_chunks").delete().eq("user_id", userId);
+  await supabase.from("lumen_documents").delete().eq("user_id", userId);
 
   const docs = seed.documents ?? [];
   const chunks = seed.chunks ?? [];
@@ -43,6 +52,7 @@ async function main() {
     const { error } = await supabase.from("lumen_documents").insert(
       docs.map((d) => ({
         id: d.id,
+        user_id: userId,
         title: d.title,
         filename: d.filename,
         chars: d.chars,
@@ -54,11 +64,11 @@ async function main() {
   }
 
   if (chunks.length) {
-    // insert in batches to avoid payload limits
     const batchSize = 50;
     for (let i = 0; i < chunks.length; i += batchSize) {
       const batch = chunks.slice(i, i + batchSize).map((c) => ({
         id: c.id,
+        user_id: userId,
         document_id: c.documentId,
         title: c.title,
         filename: c.filename,
@@ -71,7 +81,9 @@ async function main() {
     }
   }
 
-  console.log(`Seeded ${docs.length} documents, ${chunks.length} chunks.`);
+  console.log(
+    `Seeded ${docs.length} documents, ${chunks.length} chunks for user ${userId}.`,
+  );
 }
 
 main().catch((err) => {

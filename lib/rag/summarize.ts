@@ -3,6 +3,7 @@ import {
   chatModelCandidates,
   getChatClient,
 } from "@/lib/openai";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   friendlyApiError,
   getErrorStatus,
@@ -91,11 +92,13 @@ export type SummarizeResult = {
  * Reduce: merge document summaries into one final overview.
  */
 export async function summarizeCorpus(opts: {
+  userId: string;
+  supabase?: SupabaseClient;
   documentIds?: string[];
   focus?: string;
   onProgress?: (p: SummarizeProgress) => void;
 }): Promise<SummarizeResult> {
-  const store = await readStore();
+  const store = await readStore(opts.userId, opts.supabase);
   const groups = groupChunksByDoc(
     store.documents,
     store.chunks,

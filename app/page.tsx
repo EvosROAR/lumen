@@ -13,18 +13,18 @@ export default function HomePage() {
         <p className="font-[family-name:var(--font-display)] text-lg font-semibold tracking-[0.18em] text-ink">
           LUMEN
         </p>
-        <nav className="flex items-center gap-4">
+        <nav className="flex items-center gap-3">
           <Link
-            href="/desk"
+            href="/login"
             className="text-sm font-medium text-ink-soft transition hover:text-teal"
           >
-            Desk
+            Masuk
           </Link>
           <Link
-            href="/eval"
-            className="text-sm font-medium text-ink-soft transition hover:text-teal"
+            href="/login"
+            className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-mist transition hover:bg-teal"
           >
-            Eval
+            Mulai
           </Link>
         </nav>
       </header>
@@ -37,41 +37,41 @@ export default function HomePage() {
           Tanya dokumenmu. Dapat jawaban yang bisa dilacak.
         </h1>
         <p className="animate-rise-delay-2 mt-5 max-w-xl text-base leading-relaxed text-ink-soft sm:text-lg">
-          Knowledge desk berbasis RAG: unggah kebijakan atau runbook, lalu chat
-          dengan sitasi sumber — dibangun sebagai proyek portofolio AI Developer.
+          Knowledge desk berbasis RAG: unggah PDF atau teks, chat dengan sitasi,
+          bandingkan Vector/BM25/Hybrid, dan ukur retrieval untuk riset atau skripsi.
         </p>
         <div className="animate-rise-delay-2 mt-10 flex flex-wrap gap-3">
           <Link
-            href="/desk"
+            href="/login"
             className="rounded-full bg-ink px-6 py-3 text-sm font-semibold text-mist transition hover:bg-teal"
           >
-            Mulai di Desk
+            Masuk / Daftar
           </Link>
           <a
-            href="#arsitektur"
+            href="#fitur"
             className="rounded-full border border-ink/15 bg-white/40 px-6 py-3 text-sm font-semibold text-ink-soft backdrop-blur transition hover:border-teal/40 hover:text-teal"
           >
-            Lihat arsitektur
+            Lihat kemampuan
           </a>
         </div>
       </section>
 
       <section
-        id="arsitektur"
+        id="fitur"
         className="relative z-10 border-t border-ink/10 bg-white/35 backdrop-blur-sm"
       >
         <div className="mx-auto grid max-w-6xl gap-10 px-6 py-16 md:grid-cols-3">
           <Feature
             title="Hybrid retrieval"
-            body="Skor digabung dari embedding + BM25 supaya angka dan keyword eksak tetap ketemu."
+            body="Embedding + BM25 digabung supaya makna dan keyword eksak sama-sama tertangkap."
           />
           <Feature
             title="Jawaban + sitasi"
-            body="Streaming answer dengan rujukan sumber — supaya klaim bisa diverifikasi."
+            body="Streaming answer dengan sumber terambil — klaim bisa diverifikasi dari cuplikan dokumen."
           />
           <Feature
-            title="Golden eval"
-            body="15 pertanyaan uji mengukur Recall@K dan Precision@K di halaman /eval."
+            title="Eval & eksperimen"
+            body="Golden set per akun, bandingkan 3 mode retrieval, plus log latency untuk analisis."
           />
         </div>
       </section>
@@ -81,11 +81,12 @@ export default function HomePage() {
 
 function Feature({ title, body }: { title: string; body: string }) {
   return (
-    <div>
-      <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold text-ink">
+    <div className="group">
+      <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold text-ink transition group-hover:text-teal">
         {title}
       </h2>
       <p className="mt-3 text-sm leading-relaxed text-ink-soft">{body}</p>
+      <div className="mt-4 h-px w-10 bg-teal/40 transition-all duration-300 group-hover:w-16" />
     </div>
   );
 }

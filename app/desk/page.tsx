@@ -1,8 +1,12 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Citation, DocumentMeta } from "@/lib/types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AppHeader } from "@/components/AppHeader";
+import { ConfirmModal } from "@/components/ConfirmModal";
+import { Badge, Btn, Panel, ScoreBar } from "@/components/ui";
+import type { Citation, ConversationMeta, DocumentMeta } from "@/lib/types";
+
+type MobilePane = "chat" | "library" | "history";
 
 type ChatRole = "user" | "assistant";
 
@@ -17,6 +21,7 @@ type DocsResponse = {
   configured: boolean;
   demoMode?: boolean;
   storage?: "supabase" | "file";
+  user?: { id: string; email?: string | null };
   documents: DocumentMeta[];
   chunkCount: number;
 };
@@ -28,7 +33,10 @@ export default function DeskPage() {
   const [configured, setConfigured] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
   const [storage, setStorage] = useState<"supabase" | "file">("file");
+  const [email, setEmail] = useState<string | null>(null);
   const [messages, setMessages] = useState<UiMessage[]>([]);
+  const [conversations, setConversations] = useState<ConversationMeta[]>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -37,6 +45,11 @@ export default function DeskPage() {
   const [pasteBody, setPasteBody] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [mobilePane, setMobilePane] = useState<MobilePane>("chat");
+  const [pendingDelete, setPendingDelete] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -44,32 +57,86 @@ export default function DeskPage() {
 
   const refreshDocs = useCallback(async () => {
     const res = await fetch("/api/documents");
+    if (res.status === 401) {
+      window.location.href = "/login?next=/desk";
+      return;
+    }
     const data = (await res.json()) as DocsResponse;
     setDocs(data.documents);
     setChunkCount(data.chunkCount);
     setConfigured(data.configured);
     setDemoMode(Boolean(data.demoMode));
     setStorage(data.storage === "supabase" ? "supabase" : "file");
+    setEmail(data.user?.email ?? null);
+  }, []);
+
+  const refreshConversations = useCallback(async () => {
+    const res = await fetch("/api/conversations");
+    if (!res.ok) return;
+    const data = (await res.json()) as { conversations: ConversationMeta[] };
+    setConversations(data.conversations);
   }, []);
 
   useEffect(() => {
     if (!mounted) return;
     void refreshDocs();
-  }, [mounted, refreshDocs]);
+    void refreshConversations();
+  }, [mounted, refreshDocs, refreshConversations]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, busy]);
 
-  const suggestions = useMemo(
-    () => [
-      "Berapa hari cuti tahunan karyawan?",
-      "Berapa SLA first response P1 support?",
-      "Apa aturan hybrid remote work?",
-      "Bagaimana cara klaim expense?",
-    ],
-    [],
-  );
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    void (async () => {
+      try {
+        const res = await fetch("/api/suggestions");
+        if (!res.ok) return;
+        const json = (await res.json()) as { suggestions?: string[] };
+        setSuggestions(json.suggestions ?? []);
+      } catch {
+        setSuggestions([]);
+      }
+    })();
+  }, [mounted, docs.length]);
+
+  async function startNewChat() {
+    setConversationId(null);
+    setMessages([]);
+    setStatus(null);
+  }
+
+  async function loadConversation(id: string) {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/conversations/${id}/messages`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal memuat percakapan.");
+      setConversationId(id);
+      setMessages(
+        (data.messages as {
+          id: string;
+          role: ChatRole;
+          content: string;
+          citations?: Citation[] | null;
+        }[])
+          .filter((m) => m.role === "user" || m.role === "assistant")
+          .map((m) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            citations: m.citations ?? undefined,
+          })),
+      );
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Gagal memuat percakapan.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function summarizeAll(focus?: string) {
     if (docs.length === 0 || busy) return;
@@ -210,6 +277,7 @@ ${mapList}`;
         throw new Error(data.error || "Hapus gagal.");
       }
       await refreshDocs();
+      setPendingDelete(null);
       setStatus("Dokumen dihapus dari knowledge store.");
     } catch (err) {
       setStatus(err instanceof Error ? err.message : "Hapus gagal.");
@@ -242,6 +310,7 @@ ${mapList}`;
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          conversationId: conversationId || undefined,
           messages: nextMessages.map((m) => ({
             role: m.role,
             content: m.content,
@@ -270,12 +339,19 @@ ${mapList}`;
         for (const line of lines) {
           if (!line.trim()) continue;
           const event = JSON.parse(line) as
+            | { type: "meta"; conversationId: string; retrieveMs: number }
             | { type: "citations"; citations: Citation[] }
             | { type: "token"; token: string }
-            | { type: "done" }
+            | {
+                type: "done";
+                conversationId?: string;
+                latency?: { retrieveMs: number; generateMs: number; totalMs: number };
+              }
             | { type: "error"; error: string };
 
-          if (event.type === "citations") {
+          if (event.type === "meta") {
+            setConversationId(event.conversationId);
+          } else if (event.type === "citations") {
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === assistantId ? { ...m, citations: event.citations } : m,
@@ -289,6 +365,13 @@ ${mapList}`;
                   : m,
               ),
             );
+          } else if (event.type === "done") {
+            if (event.latency) {
+              setStatus(
+                `Latency: retrieve ${event.latency.retrieveMs}ms · generate ${event.latency.generateMs}ms · total ${event.latency.totalMs}ms`,
+              );
+            }
+            void refreshConversations();
           } else if (event.type === "error") {
             throw new Error(event.error);
           }
@@ -319,294 +402,392 @@ ${mapList}`;
     );
   }
 
-  return (
-    <main className="min-h-screen">
-      <header className="border-b border-ink/10 bg-white/50 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/"
-              className="font-[family-name:var(--font-display)] text-sm font-semibold tracking-[0.18em] text-ink"
-            >
-              LUMEN
-            </Link>
-            <span className="hidden text-xs text-ink-soft sm:inline">
-              Knowledge Desk
-            </span>
-          </div>
-          <div className="flex items-center gap-3 text-xs">
-            <Link href="/eval" className="text-ink-soft transition hover:text-teal">
-              Eval
-            </Link>
-            {demoMode && (
-              <span className="rounded-full bg-ink/5 px-2.5 py-1 font-medium text-ink-soft">
-                Demo read-only
-              </span>
-            )}
-            {!demoMode && storage === "supabase" && (
-              <span className="rounded-full bg-teal/15 px-2.5 py-1 font-medium text-teal">
-                Supabase
-              </span>
-            )}
-            <span
-              className={`rounded-full px-2.5 py-1 font-medium ${
-                configured
-                  ? "bg-teal/15 text-teal"
-                  : "bg-amber-500/15 text-amber-800"
+  const historyPanel = (
+    <Panel>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="font-[family-name:var(--font-display)] text-lg font-semibold">
+          Riwayat
+        </h2>
+        <Btn
+          variant="ghost"
+          className="!px-2 !py-1 text-xs"
+          disabled={busy}
+          onClick={() => {
+            void startNewChat();
+            setMobilePane("chat");
+          }}
+        >
+          Chat baru
+        </Btn>
+      </div>
+      <ul className="mt-3 max-h-[55vh] space-y-1 overflow-y-auto pr-1">
+        {conversations.length === 0 && (
+          <li className="rounded-xl bg-mist/70 px-3 py-3 text-xs text-ink-soft">
+            Belum ada percakapan. Kirim pertanyaan pertama di panel chat.
+          </li>
+        )}
+        {conversations.map((c) => (
+          <li key={c.id}>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                void loadConversation(c.id);
+                setMobilePane("chat");
+              }}
+              className={`w-full rounded-xl px-3 py-2.5 text-left text-xs transition ${
+                conversationId === c.id
+                  ? "bg-teal/15 font-semibold text-teal"
+                  : "text-ink-soft hover:bg-ink/5"
               }`}
             >
-              {configured ? "Groq siap" : "Perlu GROQ_API_KEY"}
-            </span>
-            <span className="rounded-full bg-ink/5 px-2.5 py-1 text-ink-soft">
-              {docs.length} docs · {chunkCount} chunks
-            </span>
-          </div>
-        </div>
-      </header>
+              <span className="line-clamp-2">{c.title}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  );
 
-      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[320px_1fr] sm:px-6">
-        <aside className="space-y-4">
-          <section className="rounded-2xl border border-ink/10 bg-white/55 p-4 backdrop-blur">
-            <h2 className="font-[family-name:var(--font-display)] text-lg font-semibold">
-              Pustaka
-            </h2>
-            <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-              {demoMode
-                ? "Demo live: materi seed siap dipakai. Upload dinonaktifkan di deployment."
-                : "Unggah .txt / .md / .pdf, tempel teks, atau muat contoh."}
-            </p>
-
-            <div className="mt-4 flex flex-col gap-2">
-              {!demoMode && (
-                <>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => void loadSamples()}
-                    className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-mist transition hover:bg-teal disabled:opacity-50"
-                  >
-                    Muat contoh
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => fileRef.current?.click()}
-                    className="rounded-full border border-ink/15 bg-white/70 px-4 py-2 text-sm font-semibold text-ink-soft transition hover:border-teal/40 hover:text-teal disabled:opacity-50"
-                  >
-                    Unggah file
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => setPasteOpen((v) => !v)}
-                    className="rounded-full border border-ink/15 bg-white/70 px-4 py-2 text-sm font-semibold text-ink-soft transition hover:border-teal/40 hover:text-teal disabled:opacity-50"
-                  >
-                    Tempel teks
-                  </button>
-                </>
-              )}
-              <button
-                type="button"
-                disabled={busy || docs.length === 0}
-                onClick={() => void summarizeAll()}
-                className="rounded-full border border-teal/30 bg-teal/10 px-4 py-2 text-sm font-semibold text-teal transition hover:bg-teal hover:text-white disabled:opacity-40"
+  const libraryPanel = (
+    <div className="space-y-4">
+      <Panel>
+        <h2 className="font-[family-name:var(--font-display)] text-lg font-semibold">
+          Pustaka
+        </h2>
+        <p className="mt-1 text-xs leading-relaxed text-ink-soft">
+          Dokumen milik akunmu. Unggah .txt / .md / .pdf atau muat contoh.
+        </p>
+        <div className="mt-4 flex flex-col gap-2">
+          {!demoMode && (
+            <>
+              <Btn disabled={busy} onClick={() => void loadSamples()}>
+                Muat contoh
+              </Btn>
+              <Btn
+                variant="secondary"
+                disabled={busy}
+                onClick={() => fileRef.current?.click()}
               >
-                Rangkum semua
-              </button>
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".txt,.md,.markdown,.pdf,text/plain,text/markdown,application/pdf"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void uploadFile(file);
-                }}
-              />
-            </div>
+                Unggah file
+              </Btn>
+              <Btn
+                variant="secondary"
+                disabled={busy}
+                onClick={() => setPasteOpen((v) => !v)}
+              >
+                Tempel teks
+              </Btn>
+            </>
+          )}
+          <Btn
+            variant="teal"
+            disabled={busy || docs.length === 0}
+            onClick={() => {
+              void summarizeAll();
+              setMobilePane("chat");
+            }}
+          >
+            Rangkum semua
+          </Btn>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".txt,.md,.markdown,.pdf,text/plain,text/markdown,application/pdf"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void uploadFile(file);
+            }}
+          />
+        </div>
+        {pasteOpen && (
+          <div className="mt-4 space-y-2 border-t border-ink/10 pt-4">
+            <input
+              value={pasteTitle}
+              onChange={(e) => setPasteTitle(e.target.value)}
+              placeholder="Judul"
+              className="w-full rounded-xl border border-ink/10 bg-white/80 px-3 py-2 text-sm outline-none focus:border-teal/50"
+            />
+            <textarea
+              value={pasteBody}
+              onChange={(e) => setPasteBody(e.target.value)}
+              placeholder="Tempel kebijakan, runbook, catatan…"
+              rows={5}
+              className="w-full resize-y rounded-xl border border-ink/10 bg-white/80 px-3 py-2 text-sm outline-none focus:border-teal/50"
+            />
+            <Btn
+              variant="teal"
+              className="w-full"
+              disabled={busy || !pasteBody.trim()}
+              onClick={() => void submitPaste()}
+            >
+              Indeks teks
+            </Btn>
+          </div>
+        )}
+      </Panel>
 
-            {pasteOpen && (
-              <div className="mt-4 space-y-2 border-t border-ink/10 pt-4">
-                <input
-                  value={pasteTitle}
-                  onChange={(e) => setPasteTitle(e.target.value)}
-                  placeholder="Judul"
-                  className="w-full rounded-xl border border-ink/10 bg-white/80 px-3 py-2 text-sm outline-none focus:border-teal/50"
-                />
-                <textarea
-                  value={pasteBody}
-                  onChange={(e) => setPasteBody(e.target.value)}
-                  placeholder="Tempel kebijakan, runbook, catatan…"
-                  rows={6}
-                  className="w-full resize-y rounded-xl border border-ink/10 bg-white/80 px-3 py-2 text-sm outline-none focus:border-teal/50"
-                />
+      <Panel>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-ink">Dokumen terindeks</h3>
+          <Badge>{docs.length}</Badge>
+        </div>
+        <ul className="mt-3 max-h-[36vh] space-y-2 overflow-y-auto pr-1">
+          {docs.length === 0 && (
+            <li className="rounded-xl bg-mist/70 px-3 py-3 text-xs text-ink-soft">
+              Belum ada dokumen. Mulai dengan unggah atau muat contoh.
+            </li>
+          )}
+          {docs.map((doc) => (
+            <li
+              key={doc.id}
+              className="rounded-xl border border-ink/8 bg-mist/60 px-3 py-2.5"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-ink">
+                    {doc.title}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-ink-soft">
+                    {doc.chunks} chunk · {doc.chars.toLocaleString("id-ID")} karakter
+                  </p>
+                </div>
                 <button
                   type="button"
-                  disabled={busy || !pasteBody.trim()}
-                  onClick={() => void submitPaste()}
-                  className="w-full rounded-full bg-teal px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                  disabled={busy || demoMode}
+                  onClick={() =>
+                    setPendingDelete({ id: doc.id, title: doc.title })
+                  }
+                  className="shrink-0 text-[11px] font-medium text-ink-soft hover:text-red-700 disabled:opacity-30"
                 >
-                  Indeks teks
+                  Hapus
                 </button>
               </div>
-            )}
-          </section>
+            </li>
+          ))}
+        </ul>
+      </Panel>
+    </div>
+  );
 
-          <section className="rounded-2xl border border-ink/10 bg-white/55 p-4 backdrop-blur">
-            <h3 className="text-sm font-semibold text-ink">Dokumen terindeks</h3>
-            <ul className="mt-3 max-h-[42vh] space-y-2 overflow-y-auto pr-1">
-              {docs.length === 0 && (
-                <li className="text-xs text-ink-soft">
-                  Belum ada dokumen. Mulai dengan contoh atau upload.
-                </li>
-              )}
-              {docs.map((doc) => (
-                <li
-                  key={doc.id}
-                  className="rounded-xl border border-ink/8 bg-mist/60 px-3 py-2"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-medium text-ink">{doc.title}</p>
-                      <p className="mt-0.5 text-[11px] text-ink-soft">
-                        {doc.chunks} chunk · {doc.chars} karakter
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={busy || demoMode}
-                      onClick={() => void removeDoc(doc.id)}
-                      className="text-[11px] font-medium text-ink-soft hover:text-red-700 disabled:opacity-30"
-                    >
-                      Hapus
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </section>
-        </aside>
-
-        <section className="flex min-h-[70vh] flex-col rounded-2xl border border-ink/10 bg-white/60 backdrop-blur">
-          <div className="border-b border-ink/10 px-4 py-3 sm:px-5">
+  const chatPanel = (
+    <section className="flex min-h-[70vh] flex-col rounded-2xl border border-ink/10 bg-white/65 backdrop-blur lg:min-h-[calc(100vh-7.5rem)]">
+      <div className="border-b border-ink/10 px-4 py-3 sm:px-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
             <h2 className="font-[family-name:var(--font-display)] text-lg font-semibold">
               Percakapan
             </h2>
             <p className="text-xs text-ink-soft">
-              Tanya spesifik (RAG) atau pakai <span className="font-semibold">Rangkum semua</span> untuk ringkasan map-reduce.
+              Retrieval hybrid + jawaban ber-sitasi. Mode eksperimen ada di menu
+              Eksperimen.
             </p>
           </div>
+          <Badge tone="muted">Hybrid</Badge>
+        </div>
+      </div>
 
-          <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
-            {messages.length === 0 && (
-              <div className="flex h-full min-h-[280px] flex-col items-center justify-center text-center">
-                <p className="font-[family-name:var(--font-display)] text-2xl font-medium text-ink">
-                  Siap menjawab dari pustakamu
+      <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
+        {messages.length === 0 && (
+          <div className="animate-fade-up flex h-full min-h-[280px] flex-col items-center justify-center text-center">
+            <p className="font-[family-name:var(--font-display)] text-2xl font-medium text-ink">
+              Siap menjawab dari pustakamu
+            </p>
+            <p className="mt-2 max-w-md text-sm text-ink-soft">
+              {docs.length === 0
+                ? "Indeks dokumen dulu di tab Pustaka, lalu mulai bertanya."
+                : "Coba salah satu saran di bawah, atau ketik pertanyaan sendiri."}
+            </p>
+            <div className="mt-6 flex flex-wrap justify-center gap-2">
+              {docs.length > 0 && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void summarizeAll()}
+                  className="rounded-full bg-teal px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+                >
+                  Rangkum semua materi
+                </button>
+              )}
+              {suggestions.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  disabled={busy || docs.length === 0}
+                  onClick={() => void sendMessage(s)}
+                  className="rounded-full border border-ink/10 bg-white/80 px-3 py-1.5 text-left text-xs text-ink-soft transition hover:border-teal/40 hover:text-teal disabled:opacity-40"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {messages.map((m) => (
+          <article
+            key={m.id}
+            className={`animate-fade-up max-w-3xl ${m.role === "user" ? "ml-auto" : ""}`}
+          >
+            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-ink-soft">
+              {m.role === "user" ? "Kamu" : "Lumen"}
+            </p>
+            <div
+              className={`prose-chat whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                m.role === "user"
+                  ? "bg-ink text-mist"
+                  : "border border-ink/10 bg-mist/80 text-ink"
+              }`}
+            >
+              {m.content || (busy ? "…" : "")}
+            </div>
+            {m.role === "assistant" && m.citations && m.citations.length > 0 && (
+              <div className="mt-2 space-y-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft">
+                  Sumber terambil · hybrid
                 </p>
-                <p className="mt-2 max-w-md text-sm text-ink-soft">
-                  Muat dokumen contoh, lalu coba salah satu pertanyaan di bawah.
-                </p>
-                <div className="mt-6 flex flex-wrap justify-center gap-2">
-                  <button
-                    type="button"
-                    disabled={busy || docs.length === 0}
-                    onClick={() => void summarizeAll()}
-                    className="rounded-full bg-teal px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+                {m.citations.map((c, i) => (
+                  <div
+                    key={`${c.documentId}-${c.chunkIndex}-${i}`}
+                    className="rounded-xl border border-teal/20 bg-teal/5 px-3 py-2"
                   >
-                    Rangkum semua materi
-                  </button>
-                  {suggestions.map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      disabled={busy || docs.length === 0}
-                      onClick={() => void sendMessage(s)}
-                      className="rounded-full border border-ink/10 bg-white/80 px-3 py-1.5 text-left text-xs text-ink-soft transition hover:border-teal/40 hover:text-teal disabled:opacity-40"
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-xs font-semibold text-teal">
+                        [{i + 1}] {c.title}
+                      </p>
+                      <span className="shrink-0 text-[11px] font-medium text-ink-soft">
+                        {c.score.toFixed(3)}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-[10px] text-ink-soft">{c.filename}</p>
+                    <ScoreBar score={c.score} />
+                    <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">
+                      {c.excerpt}
+                    </p>
+                  </div>
+                ))}
               </div>
             )}
-
-            {messages.map((m) => (
-              <article
-                key={m.id}
-                className={`max-w-3xl ${m.role === "user" ? "ml-auto" : ""}`}
-              >
-                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-ink-soft">
-                  {m.role === "user" ? "Kamu" : "Lumen"}
-                </p>
-                <div
-                  className={`whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                    m.role === "user"
-                      ? "bg-ink text-mist"
-                      : "border border-ink/10 bg-mist/80 text-ink"
-                  }`}
-                >
-                  {m.content || (busy ? "…" : "")}
-                </div>
-                {m.role === "assistant" && m.citations && m.citations.length > 0 && (
-                  <div className="mt-2 space-y-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft">
-                      Sumber terambil
-                    </p>
-                    {m.citations.map((c, i) => (
-                      <div
-                        key={`${c.documentId}-${c.chunkIndex}-${i}`}
-                        className="rounded-xl border border-teal/20 bg-teal/5 px-3 py-2"
-                      >
-                        <p className="text-xs font-semibold text-teal">
-                          [{i + 1}] {c.title} · skor {c.score}
-                        </p>
-                        <p className="mt-1 text-[11px] leading-relaxed text-ink-soft">
-                          {c.excerpt}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </article>
-            ))}
-            <div ref={bottomRef} />
-          </div>
-
-          <div className="border-t border-ink/10 p-4 sm:p-5">
-            {status && (
-              <p className="mb-3 text-xs text-ink-soft" role="status">
-                {status}
-              </p>
-            )}
-            <form
-              className="flex gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void sendMessage(input);
-              }}
-            >
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                disabled={busy}
-                placeholder={
-                  docs.length === 0
-                    ? "Indeks dokumen dulu sebelum bertanya…"
-                    : "Tanyakan sesuatu dari dokumen…"
-                }
-                className="flex-1 rounded-full border border-ink/10 bg-white/90 px-4 py-3 text-sm outline-none focus:border-teal/50 disabled:opacity-60"
-              />
-              <button
-                type="submit"
-                disabled={busy || !input.trim() || docs.length === 0}
-                className="rounded-full bg-teal px-5 py-3 text-sm font-semibold text-white transition hover:bg-ink disabled:opacity-40"
-              >
-                Kirim
-              </button>
-            </form>
-          </div>
-        </section>
+          </article>
+        ))}
+        <div ref={bottomRef} />
       </div>
+
+      <div className="border-t border-ink/10 p-4 sm:p-5">
+        {status && (
+          <p className="mb-3 text-xs text-ink-soft" role="status">
+            {status}
+          </p>
+        )}
+        <form
+          className="flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void sendMessage(input);
+          }}
+        >
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            disabled={busy}
+            placeholder={
+              docs.length === 0
+                ? "Indeks dokumen dulu sebelum bertanya…"
+                : "Tanyakan sesuatu dari dokumen…"
+            }
+            className="flex-1 rounded-full border border-ink/10 bg-white/90 px-4 py-3 text-sm outline-none focus:border-teal/50 disabled:opacity-60"
+          />
+          <button
+            type="submit"
+            disabled={busy || !input.trim() || docs.length === 0}
+            className="rounded-full bg-teal px-5 py-3 text-sm font-semibold text-white transition hover:bg-ink disabled:opacity-40"
+          >
+            Kirim
+          </button>
+        </form>
+      </div>
+    </section>
+  );
+
+  return (
+    <main className="min-h-screen pb-16 lg:pb-0">
+      <AppHeader
+        title="Knowledge Desk"
+        email={email}
+        trailing={
+          <>
+            {!demoMode && storage === "supabase" && <Badge tone="teal">Supabase</Badge>}
+            <Badge tone={configured ? "teal" : "warn"}>
+              {configured ? "Groq siap" : "Perlu GROQ_API_KEY"}
+            </Badge>
+            <Badge>
+              {docs.length} docs · {chunkCount} chunks
+            </Badge>
+          </>
+        }
+      />
+
+      {/* Mobile panes */}
+      <div className="border-b border-ink/10 bg-white/40 px-4 py-2 lg:hidden">
+        <div className="mx-auto flex max-w-7xl gap-1">
+          {(
+            [
+              ["chat", "Chat"],
+              ["library", "Pustaka"],
+              ["history", "Riwayat"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setMobilePane(id)}
+              className={`flex-1 rounded-full px-3 py-2 text-xs font-semibold transition ${
+                mobilePane === id
+                  ? "bg-ink text-mist"
+                  : "text-ink-soft hover:bg-ink/5"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[300px_1fr]">
+        <aside className="hidden space-y-4 lg:block">
+          {historyPanel}
+          {libraryPanel}
+        </aside>
+
+        <div className="lg:hidden">
+          {mobilePane === "chat" && chatPanel}
+          {mobilePane === "library" && libraryPanel}
+          {mobilePane === "history" && historyPanel}
+        </div>
+
+        <div className="hidden lg:block">{chatPanel}</div>
+      </div>
+
+      <ConfirmModal
+        open={Boolean(pendingDelete)}
+        title="Hapus dokumen terindeks?"
+        description={
+          pendingDelete
+            ? `"${pendingDelete.title}" akan dihapus dari pustaka akunmu beserta semua chunk-nya. Tindakan ini tidak bisa dibatalkan.`
+            : ""
+        }
+        confirmLabel="Ya, hapus"
+        cancelLabel="Batal"
+        tone="danger"
+        busy={busy}
+        onCancel={() => {
+          if (!busy) setPendingDelete(null);
+        }}
+        onConfirm={() => {
+          if (pendingDelete) void removeDoc(pendingDelete.id);
+        }}
+      />
     </main>
   );
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isAuthError, requireUser } from "@/lib/auth";
 import { deleteDocument } from "@/lib/rag/ingest";
 import { hasChatKey } from "@/lib/openai";
 import {
@@ -10,23 +11,27 @@ import {
 export const runtime = "nodejs";
 
 export async function GET() {
-  const store = await readStore();
+  const auth = await requireUser();
+  if (isAuthError(auth)) return auth.error;
+
+  const store = await readStore(auth.user.id, auth.supabase);
   return NextResponse.json({
     configured: hasChatKey(),
     demoMode: isDemoMode(),
     storage: usingSupabaseStore() ? "supabase" : "file",
+    user: { id: auth.user.id, email: auth.user.email },
     documents: store.documents,
     chunkCount: store.chunks.length,
   });
 }
 
 export async function DELETE(request: Request) {
+  const auth = await requireUser();
+  if (isAuthError(auth)) return auth.error;
+
   if (isDemoMode()) {
     return NextResponse.json(
-      {
-        error:
-          "Mode demo read-only: hapus dokumen dinonaktifkan. Sambungkan Supabase untuk mengaktifkan hapus.",
-      },
+      { error: "Mode demo read-only: hapus dokumen dinonaktifkan." },
       { status: 403 },
     );
   }
@@ -35,6 +40,6 @@ export async function DELETE(request: Request) {
   if (!body.id) {
     return NextResponse.json({ error: "id wajib." }, { status: 400 });
   }
-  await deleteDocument(body.id);
+  await deleteDocument(auth.user.id, body.id, auth.supabase);
   return NextResponse.json({ ok: true });
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isAuthError, requireUser } from "@/lib/auth";
 import { hasChatKey } from "@/lib/openai";
 import { summarizeCorpus } from "@/lib/rag/summarize";
 import { friendlyApiError, getErrorStatus } from "@/lib/retry";
@@ -7,6 +8,9 @@ export const runtime = "nodejs";
 export const maxDuration = 120;
 
 export async function POST(request: Request) {
+  const auth = await requireUser();
+  if (isAuthError(auth)) return auth.error;
+
   if (!hasChatKey()) {
     return NextResponse.json(
       {
@@ -24,6 +28,8 @@ export async function POST(request: Request) {
     };
 
     const result = await summarizeCorpus({
+      userId: auth.user.id,
+      supabase: auth.supabase,
       documentIds: body.documentIds,
       focus: body.focus,
     });

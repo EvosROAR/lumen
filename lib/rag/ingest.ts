@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { chunkText } from "@/lib/rag/chunk";
 import { embedTexts } from "@/lib/rag/embed";
 import { removeDocument, saveDocument } from "@/lib/rag/store";
@@ -7,11 +8,15 @@ function slugId(prefix: string) {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export async function ingestDocument(input: {
-  title: string;
-  filename: string;
-  content: string;
-}): Promise<DocumentMeta> {
+export async function ingestDocument(
+  userId: string,
+  input: {
+    title: string;
+    filename: string;
+    content: string;
+  },
+  supabase?: SupabaseClient,
+): Promise<DocumentMeta> {
   const content = input.content.trim();
   if (!content) {
     throw new Error("Dokumen kosong.");
@@ -43,10 +48,14 @@ export async function ingestDocument(input: {
     embedding: embeddings[index],
   }));
 
-  await saveDocument(meta, chunks);
+  await saveDocument(userId, meta, chunks, supabase);
   return meta;
 }
 
-export async function deleteDocument(documentId: string): Promise<void> {
-  await removeDocument(documentId);
+export async function deleteDocument(
+  userId: string,
+  documentId: string,
+  supabase?: SupabaseClient,
+): Promise<void> {
+  await removeDocument(userId, documentId, supabase);
 }

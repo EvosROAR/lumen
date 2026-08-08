@@ -13,6 +13,7 @@
     "eval": "node scripts/run-eval.mjs"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.109.0",
     "next": "^15.3.3",
     "openai": "^4.104.0",

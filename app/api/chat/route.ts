@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
+import { isAuthError, requireUser } from "@/lib/auth";
+import {
+  appendMessage,
+  createConversation,
+  touchConversationTitle,
+} from "@/lib/conversations";
 import {
   chatModelCandidates,
   getChatClient,
   hasChatKey,
 } from "@/lib/openai";
+import { insertQueryLog } from "@/lib/query-logs";
 import { buildContext, retrieve } from "@/lib/rag/retrieve";
 import {
   friendlyApiError,
@@ -11,6 +18,7 @@ import {
   isRetryableStatus,
   withRetry,
 } from "@/lib/retry";
+import type { Citation } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -20,6 +28,9 @@ type ChatMessage = {
 };
 
 export async function POST(request: Request) {
+  const auth = await requireUser();
+  if (isAuthError(auth)) return auth.error;
+
   if (!hasChatKey()) {
     return NextResponse.json(
       {
@@ -31,7 +42,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = (await request.json()) as { messages?: ChatMessage[] };
+    const body = (await request.json()) as {
+      messages?: ChatMessage[];
+      conversationId?: string;
+    };
     const messages = body.messages ?? [];
     const lastUser = [...messages].reverse().find((m) => m.role === "user");
 
@@ -39,7 +53,39 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Pesan user kosong." }, { status: 400 });
     }
 
-    const { hits, citations } = await retrieve(lastUser.content, 4);
+    let conversationId = body.conversationId;
+    if (!conversationId) {
+      const conv = await createConversation(
+        auth.user.id,
+        lastUser.content.slice(0, 60),
+        auth.supabase,
+      );
+      conversationId = conv.id;
+    } else {
+      await touchConversationTitle(
+        auth.user.id,
+        conversationId,
+        lastUser.content.slice(0, 60),
+        auth.supabase,
+      );
+    }
+
+    await appendMessage(
+      auth.user.id,
+      conversationId,
+      { role: "user", content: lastUser.content },
+      auth.supabase,
+    );
+
+    const totalStarted = Date.now();
+    const retrieveStarted = Date.now();
+    const { hits, citations } = await retrieve(lastUser.content, {
+      topK: 4,
+      mode: "hybrid",
+      userId: auth.user.id,
+      supabase: auth.supabase,
+    });
+    const retrieveMs = Date.now() - retrieveStarted;
     const context = buildContext(hits);
 
     const system = `Kamu adalah Lumen, asisten knowledge desk.
@@ -64,6 +110,7 @@ ${context ? `Konteks:\n${context}` : "Konteks: (kosong — belum ada dokumen rel
     > | null = null;
     let lastError: unknown;
 
+    const generateStarted = Date.now();
     for (const model of chatModelCandidates()) {
       try {
         completion = await withRetry(
@@ -92,20 +139,62 @@ ${context ? `Konteks:\n${context}` : "Konteks: (kosong — belum ada dokumen rel
     }
 
     const encoder = new TextEncoder();
+    const userId = auth.user.id;
+    const supabase = auth.supabase;
     const stream = new ReadableStream({
       async start(controller) {
         const send = (payload: unknown) => {
           controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`));
         };
 
+        send({ type: "meta", conversationId, retrieveMs });
         send({ type: "citations", citations });
 
+        let assistantText = "";
         try {
           for await (const part of completion) {
             const token = part.choices[0]?.delta?.content;
-            if (token) send({ type: "token", token });
+            if (token) {
+              assistantText += token;
+              send({ type: "token", token });
+            }
           }
-          send({ type: "done" });
+
+          const generateMs = Date.now() - generateStarted;
+          const totalMs = Date.now() - totalStarted;
+
+          await appendMessage(
+            userId,
+            conversationId!,
+            {
+              role: "assistant",
+              content: assistantText,
+              citations: citations as Citation[],
+            },
+            supabase,
+          );
+
+          await insertQueryLog(
+            userId,
+            {
+              conversationId,
+              query: lastUser.content,
+              retrievalMode: "hybrid",
+              retrieveMs,
+              generateMs,
+              totalMs,
+              topK: 4,
+              citationCount: citations.length,
+              citationFilenames: citations.map((c) => c.filename),
+            },
+            supabase,
+          );
+
+          send({
+            type: "done",
+            conversationId,
+            latency: { retrieveMs, generateMs, totalMs },
+          });
         } catch (err) {
           send({ type: "error", error: friendlyApiError(err) });
         } finally {

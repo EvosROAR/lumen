@@ -1,9 +1,20 @@
+/**
+ * Eval API now requires an authenticated session cookie.
+ * Prefer the /eval page in the browser after login.
+ * Optional: LUMEN_COOKIE="sb-...=..." for scripted calls.
+ */
 const base = process.env.LUMEN_BASE_URL || "http://localhost:3000";
+const cookie = process.env.LUMEN_COOKIE || "";
 
-const res = await fetch(`${base}/api/eval?k=4`);
+const res = await fetch(`${base}/api/eval?k=4`, {
+  headers: cookie ? { cookie } : {},
+});
 if (!res.ok) {
   const body = await res.text();
   console.error("Eval failed:", res.status, body);
+  if (res.status === 401) {
+    console.error("Login in the browser, or set LUMEN_COOKIE for this script.");
+  }
   process.exit(1);
 }
 

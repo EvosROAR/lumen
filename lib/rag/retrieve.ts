@@ -1,7 +1,12 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { bm25Scores, tokenizeText } from "@/lib/rag/bm25";
 import { cosineSimilarity, embedQuery, embedTexts } from "@/lib/rag/embed";
 import { isDemoMode, readStore, replaceChunkEmbeddings } from "@/lib/rag/store";
-import type { Citation, RetrievedChunk } from "@/lib/types";
+import type {
+  Citation,
+  RetrievedChunk,
+  RetrievalMode,
+} from "@/lib/types";
 
 function normalizeMap(values: Map<string, number>): Map<string, number> {
   const nums = [...values.values()];
@@ -15,11 +20,21 @@ function normalizeMap(values: Map<string, number>): Map<string, number> {
   return out;
 }
 
+export type RetrieveOptions = {
+  topK?: number;
+  mode?: RetrievalMode;
+  userId: string;
+  supabase?: SupabaseClient;
+};
+
 export async function retrieve(
   query: string,
-  topK = 4,
+  options: RetrieveOptions,
 ): Promise<{ hits: RetrievedChunk[]; citations: Citation[] }> {
-  const store = await readStore();
+  const topK = options.topK ?? 4;
+  const mode = options.mode ?? "hybrid";
+  const store = await readStore(options.userId, options.supabase);
+
   if (store.chunks.length === 0) {
     return { hits: [], citations: [] };
   }
@@ -35,7 +50,7 @@ export async function retrieve(
     }));
 
     if (!isDemoMode()) {
-      await replaceChunkEmbeddings(chunks);
+      await replaceChunkEmbeddings(options.userId, chunks, options.supabase);
     }
   }
 
@@ -55,12 +70,14 @@ export async function retrieve(
   const normVector = normalizeMap(vectorScores);
   const normLexical = normalizeMap(lexicalScores);
 
-  // Hybrid: semantic + keyword (RRF-ish blend for demo robustness)
   const ranked: RetrievedChunk[] = chunks
     .map((chunk) => {
       const v = normVector.get(chunk.id) || 0;
       const l = normLexical.get(chunk.id) || 0;
-      const score = 0.55 * v + 0.45 * l;
+      let score = 0;
+      if (mode === "vector") score = v;
+      else if (mode === "bm25") score = l;
+      else score = 0.55 * v + 0.45 * l;
       return { ...chunk, score };
     })
     .sort((a, b) => b.score - a.score)

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isAuthError, requireUser } from "@/lib/auth";
 import { hasChatKey } from "@/lib/openai";
 import { ingestDocument } from "@/lib/rag/ingest";
 import { extractPdfText } from "@/lib/rag/pdf";
@@ -8,12 +9,12 @@ import { SAMPLE_DOCUMENTS } from "@/lib/sample-docs";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  const auth = await requireUser();
+  if (isAuthError(auth)) return auth.error;
+
   if (isDemoMode()) {
     return NextResponse.json(
-      {
-        error:
-          "Mode demo read-only: upload/muat dokumen dinonaktifkan. Materi seed sudah tersedia untuk chat, eval, dan rangkum.",
-      },
+      { error: "Mode demo read-only: upload/muat dokumen dinonaktifkan." },
       { status: 403 },
     );
   }
@@ -40,10 +41,12 @@ export async function POST(request: Request) {
       };
 
       if (body.mode === "samples") {
-        await clearStore();
+        await clearStore(auth.user.id, auth.supabase);
         const results = [];
         for (const sample of SAMPLE_DOCUMENTS) {
-          results.push(await ingestDocument(sample));
+          results.push(
+            await ingestDocument(auth.user.id, sample, auth.supabase),
+          );
         }
         return NextResponse.json({ documents: results });
       }
@@ -52,11 +55,15 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "content wajib." }, { status: 400 });
       }
 
-      const doc = await ingestDocument({
-        title: body.title || "Untitled",
-        filename: body.filename || "paste.txt",
-        content: body.content,
-      });
+      const doc = await ingestDocument(
+        auth.user.id,
+        {
+          title: body.title || "Untitled",
+          filename: body.filename || "paste.txt",
+          content: body.content,
+        },
+        auth.supabase,
+      );
       return NextResponse.json({ document: doc });
     }
 
@@ -86,11 +93,15 @@ export async function POST(request: Request) {
       content = await file.text();
     }
 
-    const doc = await ingestDocument({
-      title: file.name.replace(/\.(txt|md|markdown|pdf)$/i, ""),
-      filename: file.name,
-      content,
-    });
+    const doc = await ingestDocument(
+      auth.user.id,
+      {
+        title: file.name.replace(/\.(txt|md|markdown|pdf)$/i, ""),
+        filename: file.name,
+        content,
+      },
+      auth.supabase,
+    );
 
     return NextResponse.json({ document: doc });
   } catch (error) {

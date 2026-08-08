@@ -1,6 +1,8 @@
-import { GOLDEN_CASES } from "@/lib/eval/golden";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { resolveGoldenCases } from "@/lib/eval/user-golden";
 import { retrieve } from "@/lib/rag/retrieve";
 import { readStore } from "@/lib/rag/store";
+import type { RetrievalMode } from "@/lib/types";
 
 export type EvalCaseResult = {
   id: string;
@@ -17,19 +19,39 @@ export type EvalReport = {
   recallAtK: number;
   avgPrecisionAtK: number;
   k: number;
+  mode: RetrievalMode;
   documentCount: number;
   chunkCount: number;
   cases: EvalCaseResult[];
   generatedAt: string;
+  source: "custom" | "sample" | "none";
+  message: string | null;
+  availableFilenames: string[];
 };
 
-export async function runGoldenEval(topK = 4): Promise<EvalReport> {
-  const store = await readStore();
+export async function runGoldenEval(opts: {
+  userId: string;
+  supabase?: SupabaseClient;
+  topK?: number;
+  mode?: RetrievalMode;
+}): Promise<EvalReport> {
+  const topK = opts.topK ?? 4;
+  const mode = opts.mode ?? "hybrid";
+  const store = await readStore(opts.userId, opts.supabase);
+  const resolved = await resolveGoldenCases(
+    opts.userId,
+    store,
+    opts.supabase,
+  );
   const cases: EvalCaseResult[] = [];
 
-  for (const gold of GOLDEN_CASES) {
-    const { citations } = await retrieve(gold.question, topK);
-    const retrievedFiles = citations.map((c) => c.filename);
+  for (const gold of resolved.cases) {
+    const { citations } = await retrieve(gold.question, {
+      topK,
+      mode,
+      userId: opts.userId,
+      supabase: opts.supabase,
+    });
     const relevantRetrieved = citations.filter((c) =>
       gold.expectedFilenames.includes(c.filename),
     );
@@ -53,7 +75,9 @@ export async function runGoldenEval(topK = 4): Promise<EvalReport> {
 
   const hits = cases.filter((c) => c.hit).length;
   const avgPrecisionAtK =
-    cases.reduce((s, c) => s + c.precisionAtK, 0) / (cases.length || 1);
+    cases.length === 0
+      ? 0
+      : cases.reduce((s, c) => s + c.precisionAtK, 0) / cases.length;
 
   return {
     total: cases.length,
@@ -61,9 +85,13 @@ export async function runGoldenEval(topK = 4): Promise<EvalReport> {
     recallAtK: Number((hits / (cases.length || 1)).toFixed(3)),
     avgPrecisionAtK: Number(avgPrecisionAtK.toFixed(3)),
     k: topK,
+    mode,
     documentCount: store.documents.length,
     chunkCount: store.chunks.length,
     cases,
     generatedAt: new Date().toISOString(),
+    source: resolved.source,
+    message: resolved.message,
+    availableFilenames: resolved.availableFilenames,
   };
 }
