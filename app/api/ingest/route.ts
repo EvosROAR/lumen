@@ -7,6 +7,9 @@ import { clearStore, isDemoMode } from "@/lib/rag/store";
 import { SAMPLE_DOCUMENTS } from "@/lib/sample-docs";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
+
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // ~4MB soft limit (Vercel hobby ~4.5MB)
 
 export async function POST(request: Request) {
   const auth = await requireUser();
@@ -67,10 +70,31 @@ export async function POST(request: Request) {
       return NextResponse.json({ document: doc });
     }
 
-    const form = await request.formData();
+    let form: FormData;
+    try {
+      form = await request.formData();
+    } catch {
+      return NextResponse.json(
+        {
+          error:
+            "Gagal membaca file upload. File mungkin terlalu besar atau koneksi terputus. Batas aman ~4MB.",
+        },
+        { status: 413 },
+      );
+    }
+
     const file = form.get("file");
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "file wajib." }, { status: 400 });
+    }
+
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return NextResponse.json(
+        {
+          error: `File terlalu besar (${(file.size / (1024 * 1024)).toFixed(1)} MB). Maksimal sekitar 4 MB, atau pakai Tempel teks.`,
+        },
+        { status: 413 },
+      );
     }
 
     const name = file.name.toLowerCase();
@@ -87,8 +111,14 @@ export async function POST(request: Request) {
 
     let content: string;
     if (isPdf) {
-      const buffer = Buffer.from(await file.arrayBuffer());
-      content = await extractPdfText(buffer);
+      try {
+        const buffer = Buffer.from(await file.arrayBuffer());
+        content = await extractPdfText(buffer);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Gagal membaca PDF.";
+        return NextResponse.json({ error: message }, { status: 400 });
+      }
     } else {
       content = await file.text();
     }
@@ -106,6 +136,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ document: doc });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Ingest gagal.";
+    console.error("[ingest]", message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

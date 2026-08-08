@@ -14,7 +14,6 @@ const PROTECTED_PREFIXES = [
   "/api/conversations",
   "/api/experiments",
   "/api/metrics",
-  "/api/eval/golden",
   "/api/suggestions",
 ];
 
@@ -27,9 +26,20 @@ function isProtected(pathname: string) {
 export async function middleware(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const { pathname } = request.nextUrl;
+  const isApi = pathname.startsWith("/api/");
 
   if (!url || !anon) {
-    if (isProtected(request.nextUrl.pathname)) {
+    if (isProtected(pathname)) {
+      if (isApi) {
+        return NextResponse.json(
+          {
+            error:
+              "Supabase Auth belum dikonfigurasi (NEXT_PUBLIC_SUPABASE_URL / ANON_KEY).",
+          },
+          { status: 503 },
+        );
+      }
       const loginUrl = request.nextUrl.clone();
       loginUrl.pathname = "/login";
       loginUrl.searchParams.set(
@@ -42,10 +52,9 @@ export async function middleware(request: NextRequest) {
   }
 
   const { supabaseResponse, user } = await updateSession(request);
-  const { pathname } = request.nextUrl;
 
   if (isProtected(pathname) && !user) {
-    if (pathname.startsWith("/api/")) {
+    if (isApi) {
       return NextResponse.json(
         { error: "Unauthorized. Silakan login dulu." },
         { status: 401 },
@@ -67,19 +76,30 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    "/desk",
     "/desk/:path*",
+    "/eval",
     "/eval/:path*",
+    "/experiments",
     "/experiments/:path*",
+    "/metrics",
     "/metrics/:path*",
     "/login",
+    "/api/documents",
     "/api/documents/:path*",
+    "/api/ingest",
     "/api/ingest/:path*",
+    "/api/chat",
     "/api/chat/:path*",
+    "/api/summarize",
     "/api/summarize/:path*",
     "/api/eval",
     "/api/eval/:path*",
+    "/api/conversations",
     "/api/conversations/:path*",
+    "/api/experiments",
     "/api/experiments/:path*",
+    "/api/metrics",
     "/api/metrics/:path*",
     "/api/suggestions",
     "/api/suggestions/:path*",

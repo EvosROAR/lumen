@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Badge, Btn, Panel, ScoreBar } from "@/components/ui";
+import { readJsonResponse } from "@/lib/http";
 import type { Citation, ConversationMeta, DocumentMeta } from "@/lib/types";
 
 type MobilePane = "chat" | "library" | "history";
@@ -47,6 +48,7 @@ export default function DeskPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [mobilePane, setMobilePane] = useState<MobilePane>("chat");
   const [pendingDelete, setPendingDelete] = useState<{
+    kind: "document" | "conversation";
     id: string;
     title: string;
   } | null>(null);
@@ -206,9 +208,12 @@ ${mapList}`;
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode: "samples" }),
       });
-      const data = await res.json();
+      const data = await readJsonResponse<{
+        error?: string;
+        documents?: DocumentMeta[];
+      }>(res);
       if (!res.ok) throw new Error(data.error || "Gagal memuat sampel.");
-      setStatus(`Siap — ${data.documents.length} dokumen contoh terindeks.`);
+      setStatus(`Siap — ${(data.documents ?? []).length} dokumen contoh terindeks.`);
       await refreshDocs();
     } catch (err) {
       setStatus(err instanceof Error ? err.message : "Gagal memuat sampel.");
@@ -221,12 +226,22 @@ ${mapList}`;
     setBusy(true);
     setStatus(`Mengindeks ${file.name}…`);
     try {
+      if (file.size > 4 * 1024 * 1024) {
+        throw new Error(
+          `File terlalu besar (${(file.size / (1024 * 1024)).toFixed(1)} MB). Maksimal sekitar 4 MB.`,
+        );
+      }
       const form = new FormData();
       form.append("file", file);
       const res = await fetch("/api/ingest", { method: "POST", body: form });
-      const data = await res.json();
+      const data = await readJsonResponse<{
+        error?: string;
+        document?: DocumentMeta;
+      }>(res);
       if (!res.ok) throw new Error(data.error || "Upload gagal.");
-      setStatus(`Terindeks: ${data.document.title} (${data.document.chunks} chunk).`);
+      setStatus(
+        `Terindeks: ${data.document?.title} (${data.document?.chunks} chunk).`,
+      );
       await refreshDocs();
     } catch (err) {
       setStatus(err instanceof Error ? err.message : "Upload gagal.");
@@ -250,12 +265,15 @@ ${mapList}`;
           content: pasteBody,
         }),
       });
-      const data = await res.json();
+      const data = await readJsonResponse<{
+        error?: string;
+        document?: DocumentMeta;
+      }>(res);
       if (!res.ok) throw new Error(data.error || "Ingest gagal.");
       setPasteOpen(false);
       setPasteTitle("");
       setPasteBody("");
-      setStatus(`Terindeks: ${data.document.title}.`);
+      setStatus(`Terindeks: ${data.document?.title}.`);
       await refreshDocs();
     } catch (err) {
       setStatus(err instanceof Error ? err.message : "Ingest gagal.");
@@ -281,6 +299,31 @@ ${mapList}`;
       setStatus("Dokumen dihapus dari knowledge store.");
     } catch (err) {
       setStatus(err instanceof Error ? err.message : "Hapus gagal.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeConversation(id: string) {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/conversations/${id}`, { method: "DELETE" });
+      const data = await readJsonResponse<{ error?: string; message?: string }>(
+        res,
+      );
+      if (!res.ok) throw new Error(data.error || "Hapus percakapan gagal.");
+      if (conversationId === id) {
+        setConversationId(null);
+        setMessages([]);
+      }
+      setPendingDelete(null);
+      await refreshConversations();
+      setStatus(
+        data.message ||
+          "Percakapan dihapus. Log metrik di halaman Metrik tetap ada.",
+      );
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Hapus percakapan gagal.");
     } finally {
       setBusy(false);
     }
@@ -427,7 +470,12 @@ ${mapList}`;
           </li>
         )}
         {conversations.map((c) => (
-          <li key={c.id}>
+          <li
+            key={c.id}
+            className={`flex items-stretch gap-1 rounded-xl transition ${
+              conversationId === c.id ? "bg-teal/15" : "hover:bg-ink/5"
+            }`}
+          >
             <button
               type="button"
               disabled={busy}
@@ -435,13 +483,30 @@ ${mapList}`;
                 void loadConversation(c.id);
                 setMobilePane("chat");
               }}
-              className={`w-full rounded-xl px-3 py-2.5 text-left text-xs transition ${
+              className={`min-w-0 flex-1 px-3 py-2.5 text-left text-xs ${
                 conversationId === c.id
-                  ? "bg-teal/15 font-semibold text-teal"
-                  : "text-ink-soft hover:bg-ink/5"
+                  ? "font-semibold text-teal"
+                  : "text-ink-soft"
               }`}
             >
               <span className="line-clamp-2">{c.title}</span>
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              title="Hapus percakapan"
+              aria-label={`Hapus percakapan ${c.title}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setPendingDelete({
+                  kind: "conversation",
+                  id: c.id,
+                  title: c.title,
+                });
+              }}
+              className="shrink-0 px-2.5 text-[11px] font-medium text-ink-soft hover:text-red-700 disabled:opacity-30"
+            >
+              Hapus
             </button>
           </li>
         ))}
@@ -557,7 +622,11 @@ ${mapList}`;
                   type="button"
                   disabled={busy || demoMode}
                   onClick={() =>
-                    setPendingDelete({ id: doc.id, title: doc.title })
+                    setPendingDelete({
+                      kind: "document",
+                      id: doc.id,
+                      title: doc.title,
+                    })
                   }
                   className="shrink-0 text-[11px] font-medium text-ink-soft hover:text-red-700 disabled:opacity-30"
                 >
@@ -771,11 +840,17 @@ ${mapList}`;
 
       <ConfirmModal
         open={Boolean(pendingDelete)}
-        title="Hapus dokumen terindeks?"
+        title={
+          pendingDelete?.kind === "conversation"
+            ? "Hapus percakapan?"
+            : "Hapus dokumen terindeks?"
+        }
         description={
-          pendingDelete
-            ? `"${pendingDelete.title}" akan dihapus dari pustaka akunmu beserta semua chunk-nya. Tindakan ini tidak bisa dibatalkan.`
-            : ""
+          pendingDelete?.kind === "conversation"
+            ? `"${pendingDelete.title}" akan dihapus dari daftar chat. Log latency/query di halaman Metrik tetap tersimpan.`
+            : pendingDelete
+              ? `"${pendingDelete.title}" akan dihapus dari pustaka akunmu beserta semua chunk-nya. Tindakan ini tidak bisa dibatalkan.`
+              : ""
         }
         confirmLabel="Ya, hapus"
         cancelLabel="Batal"
@@ -785,7 +860,12 @@ ${mapList}`;
           if (!busy) setPendingDelete(null);
         }}
         onConfirm={() => {
-          if (pendingDelete) void removeDoc(pendingDelete.id);
+          if (!pendingDelete) return;
+          if (pendingDelete.kind === "conversation") {
+            void removeConversation(pendingDelete.id);
+          } else {
+            void removeDoc(pendingDelete.id);
+          }
         }}
       />
     </main>

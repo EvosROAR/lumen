@@ -211,3 +211,72 @@ export async function touchConversationTitle(
     await writeFileStore(userId, store);
   }
 }
+
+/**
+ * Hapus percakapan + pesan. Log metrik (query logs) tetap ada:
+ * Supabase: conversation_id di-set null; file store: conversationId di-null-kan.
+ */
+export async function deleteConversation(
+  userId: string,
+  conversationId: string,
+  supabase?: SupabaseClient,
+) {
+  if (supabase && hasSupabasePublic()) {
+    const { data: conv, error: convErr } = await supabase
+      .from("lumen_conversations")
+      .select("id")
+      .eq("id", conversationId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (convErr) throw new Error(convErr.message);
+    if (!conv) throw new Error("Percakapan tidak ditemukan.");
+
+    // messages cascade; query_logs.conversation_id → null
+    const { error } = await supabase
+      .from("lumen_conversations")
+      .delete()
+      .eq("id", conversationId)
+      .eq("user_id", userId);
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  const store = await readFileStore(userId);
+  if (!store.conversations.some((c) => c.id === conversationId)) {
+    throw new Error("Percakapan tidak ditemukan.");
+  }
+  store.conversations = store.conversations.filter(
+    (c) => c.id !== conversationId,
+  );
+  store.messages = store.messages.filter(
+    (m) => m.conversationId !== conversationId,
+  );
+  await writeFileStore(userId, store);
+
+  // Keep metrics history; only detach conversation link
+  try {
+    const logsPath = path.join(
+      DATA_DIR,
+      "users",
+      userId,
+      "query-logs.json",
+    );
+    const raw = await fs.readFile(logsPath, "utf8");
+    const logs = JSON.parse(raw) as {
+      conversationId?: string | null;
+      [key: string]: unknown;
+    }[];
+    let changed = false;
+    for (const log of logs) {
+      if (log.conversationId === conversationId) {
+        log.conversationId = null;
+        changed = true;
+      }
+    }
+    if (changed) {
+      await fs.writeFile(logsPath, JSON.stringify(logs, null, 2), "utf8");
+    }
+  } catch {
+    // no local logs file — fine
+  }
+}
