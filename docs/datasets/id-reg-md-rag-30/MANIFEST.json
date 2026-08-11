@@ -1,0 +1,312 @@
+{
+  "source_dataset": "https://huggingface.co/datasets/Azzindani/ID_REG_MD_RAG",
+  "license": "CC BY 4.0",
+  "attribution": [
+    "Dataset Curator: Azzindani (Hugging Face Datasets)",
+    "Original Source: Government of the Republic of Indonesia (public regulations)"
+  ],
+  "note": "Dokumen digabung dari chunk pasal pada dataset ID_REG_MD_RAG untuk eksperimen RAG skripsi.",
+  "count": 30,
+  "documents": [
+    {
+      "index": 1,
+      "filename": "01-PERATURAN-PEMERINTAH-59-2007-KEGIATAN-USAHA-PANAS-BUMI.md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "59",
+      "year": "2007",
+      "about": "KEGIATAN USAHA PANAS BUMI",
+      "chunk_count": 114,
+      "chars": 74316
+    },
+    {
+      "index": 2,
+      "filename": "02-PERATURAN-PEMERINTAH-41-2008-PERUSAHAAN-UMUM.md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "41",
+      "year": "2008",
+      "about": "PERUSAHAAN UMUM",
+      "chunk_count": 108,
+      "chars": 73931
+    },
+    {
+      "index": 3,
+      "filename": "03-PERATURAN-PEMERINTAH-32-2009-TEMPAT-PENIMBUNAN-BERIKAT.md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "32",
+      "year": "2009",
+      "about": "TEMPAT PENIMBUNAN BERIKAT",
+      "chunk_count": 80,
+      "chars": 72516
+    },
+    {
+      "index": 4,
+      "filename": "04-Unknown-4-2010-JABATAN-FUNGSIONAL-PEMERIKSA-PADA-BADAN-PEMERIKSA-KEUANGAN.md",
+      "regulation_type": "Unknown",
+      "regulation_number": "4",
+      "year": "2010",
+      "about": "JABATAN FUNGSIONAL PEMERIKSA PADA BADAN PEMERIKSA KEUANGAN",
+      "chunk_count": 59,
+      "chars": 38717
+    },
+    {
+      "index": 5,
+      "filename": "05-Unknown-1-2011-MAJELIS-KEHORMATAN-KODE-ETIK-BADAN-PEMERIKSA-KEUANGAN.md",
+      "regulation_type": "Unknown",
+      "regulation_number": "1",
+      "year": "2011",
+      "about": "MAJELIS KEHORMATAN KODE ETIK BADAN PEMERIKSA KEUANGAN",
+      "chunk_count": 37,
+      "chars": 24971
+    },
+    {
+      "index": 6,
+      "filename": "06-Unknown-NA-2023-TATA-CARA-PEMBERIAN-KETERANGAN-AHLI.md",
+      "regulation_type": "Unknown",
+      "regulation_number": "N/A",
+      "year": "2023",
+      "about": "TATA CARA PEMBERIAN KETERANGAN AHLI",
+      "chunk_count": 22,
+      "chars": 13667
+    },
+    {
+      "index": 7,
+      "filename": "07-UNDANG-UNDANG-3-2008-TATA-CARA-PEMANGGILAN-DAN-PERMINTAAN-KETERANGAN-OLEH-BADAN-PEMERIKSA-KEUANGAN.md",
+      "regulation_type": "UNDANG-UNDANG",
+      "regulation_number": "3",
+      "year": "2008",
+      "about": "TATA CARA PEMANGGILAN DAN PERMINTAAN KETERANGAN OLEH BADAN PEMERIKSA KEUANGAN",
+      "chunk_count": 18,
+      "chars": 19243
+    },
+    {
+      "index": 8,
+      "filename": "08-Unknown-4-2016-MAJELIS-KEHORMATANKODE-ETIK-BADANPEMERIKSA-KEUANGAN.md",
+      "regulation_type": "Unknown",
+      "regulation_number": "4",
+      "year": "2016",
+      "about": "MAJELIS KEHORMATANKODE ETIK BADANPEMERIKSA KEUANGAN",
+      "chunk_count": 8,
+      "chars": 26261
+    },
+    {
+      "index": 9,
+      "filename": "09-PERATURAN-PEMERINTAH-33-2007-KESELAMATAN-RADIASI-PENGION-DAN-KEAMANAN-SUMBER-RADIOAKTIF.md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "33",
+      "year": "2007",
+      "about": "KESELAMATAN RADIASI PENGION DAN KEAMANAN SUMBER RADIOAKTIF",
+      "chunk_count": 110,
+      "chars": 62435
+    },
+    {
+      "index": 10,
+      "filename": "10-PERATURAN-PEMERINTAH-40-2007-PERUSAHAAN-UMUM-(PERUM)-LEMBAGA-KANTOR-BERITA-NASIONAL-ANTARA.md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "40",
+      "year": "2007",
+      "about": "PERUSAHAAN UMUM (PERUM) LEMBAGA KANTOR BERITA NASIONAL ANTARA",
+      "chunk_count": 106,
+      "chars": 74496
+    },
+    {
+      "index": 11,
+      "filename": "11-PERATURAN-PEMERINTAH-36-2007-PELAKSANAAN-UNDANG-UNDANG-NOMOR-9-TAHUN-2006-TENTANG-SISTEM-RESI-GUDANG.md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "36",
+      "year": "2007",
+      "about": "PELAKSANAAN UNDANG-UNDANG NOMOR 9 TAHUN 2006 TENTANG SISTEM RESI GUDANG",
+      "chunk_count": 98,
+      "chars": 77643
+    },
+    {
+      "index": 12,
+      "filename": "12-PERATURAN-PEMERINTAH-37-2007-PELAKSANAAN-UNDANG-UNDANG-NOMOR-23-TAHUN-2006-TENTANG-ADMINISTRASI-KEPENDUDUKAN.md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "37",
+      "year": "2007",
+      "about": "PELAKSANAAN UNDANG-UNDANG NOMOR 23 TAHUN 2006 TENTANG ADMINISTRASI KEPENDUDUKAN",
+      "chunk_count": 96,
+      "chars": 49909
+    },
+    {
+      "index": 13,
+      "filename": "13-PERATURAN-PEMERINTAH-48-2008-PENDANAAN-PENDIDIKAN..md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "48",
+      "year": "2008",
+      "about": "PENDANAAN PENDIDIKAN.",
+      "chunk_count": 84,
+      "chars": 64169
+    },
+    {
+      "index": 14,
+      "filename": "14-PERATURAN-PEMERINTAH-76-2008-REHABILITASI-DAN-REKLAMASI-HUTAN.md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "76",
+      "year": "2008",
+      "about": "REHABILITASI DAN REKLAMASI HUTAN",
+      "chunk_count": 80,
+      "chars": 54348
+    },
+    {
+      "index": 15,
+      "filename": "15-PERATURAN-PEMERINTAH-6-2008-PEDOMAN-EVALUASI.md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "6",
+      "year": "2008",
+      "about": "PEDOMAN EVALUASI",
+      "chunk_count": 80,
+      "chars": 51136
+    },
+    {
+      "index": 16,
+      "filename": "16-PERATURAN-PEMERINTAH-60-2007-KONSERVASI-SUMBER-DAYA-IKAN.md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "60",
+      "year": "2007",
+      "about": "KONSERVASI SUMBER DAYA IKAN",
+      "chunk_count": 78,
+      "chars": 55024
+    },
+    {
+      "index": 17,
+      "filename": "17-PERATURAN-PEMERINTAH-51-2009-PEKERJAAN-KEFARMASIAN.md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "51",
+      "year": "2009",
+      "about": "PEKERJAAN KEFARMASIAN",
+      "chunk_count": 78,
+      "chars": 37882
+    },
+    {
+      "index": 18,
+      "filename": "18-PERATURAN-PEMERINTAH-2-2007-TATA-CARA-MEMPEROLEH-KEHILANGAN-PEMBATALAN-DAN-MEMPEROLEH-KEMBALI-KEWARGANEGARAA.md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "2",
+      "year": "2007",
+      "about": "TATA CARA MEMPEROLEH, KEHILANGAN, PEMBATALAN, DAN MEMPEROLEH KEMBALI KEWARGANEGARAAN REPUBLIK INDONESIA",
+      "chunk_count": 76,
+      "chars": 63305
+    },
+    {
+      "index": 19,
+      "filename": "19-PERATURAN-PEMERINTAH-8-2008-TAHAPAN-TATA-CARA-PENYUSUNAN-PENGENDALIAN-DAN-EVALUASI-PELAKSANAAN-RENCANA-PEMBA.md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "8",
+      "year": "2008",
+      "about": "TAHAPAN, TATA CARA PENYUSUNAN, PENGENDALIAN DAN EVALUASI PELAKSANAAN RENCANA PEMBANGUNAN DAERAH",
+      "chunk_count": 71,
+      "chars": 37135
+    },
+    {
+      "index": 20,
+      "filename": "20-PERATURAN-PEMERINTAH-41-2007-ORGANISASI-PERANGKAT-DAERAH.md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "41",
+      "year": "2007",
+      "about": "ORGANISASI PERANGKAT DAERAH",
+      "chunk_count": 67,
+      "chars": 59601
+    },
+    {
+      "index": 21,
+      "filename": "21-PERATURAN-PEMERINTAH-30-2008-PENYELENGGARAAN-PENELITIAN-DAN-PENGEMBANGAN-PERIKANAN.md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "30",
+      "year": "2008",
+      "about": "PENYELENGGARAAN PENELITIAN DAN PENGEMBANGAN PERIKANAN",
+      "chunk_count": 67,
+      "chars": 55198
+    },
+    {
+      "index": 22,
+      "filename": "22-PERATURAN-PEMERINTAH-55-2007-PENDIDIKAN-AGAMA-DAN-PENDIDIKAN-KEAGAMAAN.md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "55",
+      "year": "2007",
+      "about": "PENDIDIKAN AGAMA DAN PENDIDIKAN KEAGAMAAN",
+      "chunk_count": 64,
+      "chars": 40063
+    },
+    {
+      "index": 23,
+      "filename": "23-PERATURAN-PEMERINTAH-15-2007-TATA-CARA-MEMPEROLEH-INFORMASI-KETENAGAKERJAAN-DAN-PENYUSUNAN-SERTA-PELAKSANAAN-.md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "15",
+      "year": "2007",
+      "about": "TATA CARA MEMPEROLEH INFORMASI KETENAGAKERJAAN DAN PENYUSUNAN SERTA PELAKSANAAN PERENCANAAN TENAGA KERJA",
+      "chunk_count": 63,
+      "chars": 40101
+    },
+    {
+      "index": 24,
+      "filename": "24-PERATURAN-PEMERINTAH-37-2009-DOSEN.md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "37",
+      "year": "2009",
+      "about": "DOSEN",
+      "chunk_count": 60,
+      "chars": 53896
+    },
+    {
+      "index": 25,
+      "filename": "25-PERATURAN-PEMERINTAH-3-2008-I.-UMUM.md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "3",
+      "year": "2008",
+      "about": "I. UMUM",
+      "chunk_count": 59,
+      "chars": 65975
+    },
+    {
+      "index": 26,
+      "filename": "26-PERATURAN-PEMERINTAH-78-2007-TATA-CARA-PEMBENTUKAN-PENGHAPUSAN-DAN-PENGGABUNGAN-DAERAH.md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "78",
+      "year": "2007",
+      "about": "TATA CARA PEMBENTUKAN, PENGHAPUSAN, DAN PENGGABUNGAN DAERAH",
+      "chunk_count": 55,
+      "chars": 78481
+    },
+    {
+      "index": 27,
+      "filename": "27-PERATURAN-PEMERINTAH-8-2007-INVESTASI-PEMERINTAH.md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "8",
+      "year": "2007",
+      "about": "INVESTASI PEMERINTAH",
+      "chunk_count": 55,
+      "chars": 35642
+    },
+    {
+      "index": 28,
+      "filename": "28-PERATURAN-PEMERINTAH-63-2008-PELAKSANAAN-UNDANG-UNDANG-TENTANG-YAYASAN.md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "63",
+      "year": "2008",
+      "about": "PELAKSANAAN UNDANG-UNDANG TENTANG YAYASAN",
+      "chunk_count": 55,
+      "chars": 34868
+    },
+    {
+      "index": 29,
+      "filename": "29-PERATURAN-PEMERINTAH-39-2007-PENGELOLAAN-UANG-NEGARADAERAH.md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "39",
+      "year": "2007",
+      "about": "PENGELOLAAN UANG NEGARA/DAERAH",
+      "chunk_count": 53,
+      "chars": 37636
+    },
+    {
+      "index": 30,
+      "filename": "30-PERATURAN-PEMERINTAH-54-2007-PELAKSANAAN-PENGANGKATAN-ANAK.md",
+      "regulation_type": "PERATURAN PEMERINTAH",
+      "regulation_number": "54",
+      "year": "2007",
+      "about": "PELAKSANAAN PENGANGKATAN ANAK",
+      "chunk_count": 53,
+      "chars": 21494
+    }
+  ]
+}

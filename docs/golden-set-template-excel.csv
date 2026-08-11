@@ -1,0 +1,61 @@
+﻿id;question;question_type;expected_filenames;split;answer_hint;notes;sumber
+G001;Berapa hari cuti tahunan yang didapat karyawan penuh waktu?;langsung;01-kebijakan-cuti.md;test;12 hari;Contoh sample — ganti sesuai corpus skripsi;Sample docs Lumen (lib/sample-docs.ts) + golden sample
+G002;Berapa lama jatah cuti istirahat tahunan untuk pegawai full-time?;sinonim;01-kebijakan-cuti.md;test;12 hari;Parafrase dari G001;Sample docs Lumen
+G003;Jika karyawan sakit dua hari atau lebih, apa dokumen yang wajib dilampirkan?;multi-kalimat;01-kebijakan-cuti.md;dev;surat dokter;;Sample docs Lumen
+G004;Apa SLA respons awal untuk insiden P1 pada jam sibuk?;langsung;02-runbook-oncall.md;test;15 menit;;Sample docs Lumen
+G005;Dalam berapa menit on-call harus merespons gangguan kritis di peak hours?;sinonim;02-runbook-oncall.md;dev;"15 menit; peak 11.00-14.00";;Sample docs Lumen
+G006;Sebutkan tahapan utama pipeline RAG pada produk Lumen.;langsung;03-panduan-produk.md;test;chunk embed retrieve generate;;Sample docs Lumen
+G007;Bagaimana kebijakan remote work mingguan (kantor vs WFH)?;langsung;04-remote-work.md;test;3 kantor 2 remote;;Sample docs Lumen
+G008;Apakah akses sistem internal dari luar kantor membutuhkan VPN?;langsung;04-remote-work.md;dev;wajib VPN;;Sample docs Lumen
+G009;Berapa batas waktu klaim reimbursement setelah transaksi?;langsung;05-sop-expense.md;test;30 hari;;Sample docs Lumen
+G010;Saluran apa saja yang sering dipakai phishing menurut panduan keamanan?;langsung;06-security-awareness.md;test;email GitHub cloud VPN;;Sample docs Lumen
+G011;Berapa jumlah approval minimal sebelum merge ke main?;langsung;07-coding-standards.md;dev;1 approval;;Sample docs Lumen
+G012;Target first response time untuk tiket support prioritas tinggi?;langsung;08-support-playbook.md;test;15 menit;;Sample docs Lumen
+G013;Berapa harga paket Pro bulanan?;langsung;09-faq-billing.md;test;249.000;;Sample docs Lumen
+G014;Apakah ada masa trial atau garansi uang kembali di awal berlangganan?;sinonim;09-faq-billing.md;dev;7 hari pertama;;Sample docs Lumen
+G015;Di lantai berapa pantri kantor berada?;langsung;10-office-facilities.md;test;lantai 12;;Sample docs Lumen
+G016;Berapa lama meeting room boleh dipesan tanpa persetujuan tambahan?;langsung;10-office-facilities.md;dev;30 menit;;Sample docs Lumen
+G017;Jelaskan ringkas: berapa cuti tahunan, dan apa syarat cuti sakit 2+ hari?;multi-kalimat;01-kebijakan-cuti.md;test;"12 hari; surat dokter 2+ hari";;Sample docs Lumen
+G018;Bandingkan SLA P1 on-call dengan first response support prioritas tinggi.;multi-dokumen;02-runbook-oncall.md | 08-support-playbook.md;test;keduanya 15 menit;Expected lebih dari satu file;Sample docs Lumen (2 file)
+G019;Apa warna resmi logo perusahaan menurut brand book internal?;tidak-ada-jawaban;;test;tidak ada di corpus;"expected_filenames kosong; harus MISS / tidak tahu";Buatan template (negatif)
+G020;Menurut file 01-kebijakan-cuti.md berapa hari cuti tahunan?;sebut-nama-file;01-kebijakan-cuti.md;dev;12 hari;;Sample docs Lumen
+G021;Bagaimana aturan cuti?;ambigu;01-kebijakan-cuti.md;test;perlu klarifikasi jenis cuti;Query terlalu luas;Sample docs Lumen
+G022;Apa kepanjangan RAG pada sistem Lumen?;langsung;Lumen-Dokumentasi-Sistem.pdf;test;Retrieval Augmented Generation;;PDF dokumentasi Lumen (docs/)
+G023;Berapa bobot default hybrid retrieval di Lumen untuk vector dan BM25?;langsung;Lumen-Dokumentasi-Sistem.pdf;test;"0.55 vector; 0.45 BM25";;PDF dokumentasi Lumen
+G024;Apakah bobot Hybrid 0.55/0.45 hasil optimasi formal atau heuristik?;sinonim;Lumen-Dokumentasi-Sistem.pdf;test;heuristik awal;;PDF dokumentasi Lumen / Q&A sidang
+G025;Bagaimana Lumen mendefinisikan HIT pada evaluasi golden set?;langsung;Lumen-Dokumentasi-Sistem.pdf;dev;expected filename di top-K;;PDF dokumentasi Lumen
+G026;Metrik apa yang dipakai untuk mengevaluasi retrieval di Lumen?;langsung;Lumen-Dokumentasi-Sistem.pdf;test;"document-level hit; Precision@K";;PDF dokumentasi Lumen
+G027;Format dokumen apa saja yang didukung Lumen?;langsung;Lumen-Dokumentasi-Sistem.pdf;test;.txt .md PDF teks;;PDF dokumentasi Lumen
+G028;Mengapa PDF hasil scan kurang cocok untuk diindeks di Lumen?;langsung;Lumen-Dokumentasi-Sistem.pdf;dev;tidak ada text layer / butuh OCR;;PDF dokumentasi Lumen
+G029;Apa perbedaan utama Vector retrieval dan BM25?;langsung;Lumen-Dokumentasi-Sistem.pdf;test;semantik vs leksikal;;PDF dokumentasi Lumen
+G030;Mode retrieval apa yang menjadi default pada fitur chat Lumen?;langsung;Lumen-Dokumentasi-Sistem.pdf;test;Hybrid;;PDF dokumentasi Lumen
+G031;Apa fokus penelitian Lumen: chatbot atau evaluasi retrieval?;sinonim;Lumen-Dokumentasi-Sistem.pdf;test;"evaluasi retrieval; chat antarmuka";;PDF dokumentasi Lumen / framing sidang
+G032;Sebutkan dua cara login yang didukung Lumen.;langsung;Lumen-Dokumentasi-Sistem.pdf;dev;"email/password; Google OAuth";;PDF dokumentasi Lumen
+G033;Jelaskan secara singkat alur ingest hingga evaluasi di Lumen.;multi-kalimat;Lumen-Dokumentasi-Sistem.pdf;test;ingest retrieve generate cite evaluate;;PDF dokumentasi Lumen
+G034;Menurut Lumen-Dokumentasi-Sistem.pdf apa saja batasan sistem?;sebut-nama-file;Lumen-Dokumentasi-Sistem.pdf;test;"chunk; golden selaras; bobot heuristik; LLM eksternal";;PDF dokumentasi Lumen
+G035;Siapa CEO perusahaan pembuat Lumen menurut dokumen resmi?;tidak-ada-jawaban;;test;tidak tersedia;Harus mengakui tidak ada di konteks;Buatan template (negatif)
+G036;;;;;;Isi dengan corpus skripsimu;
+G037;;;;;;Isi dengan corpus skripsimu;
+G038;;;;;;Isi dengan corpus skripsimu;
+G039;;;;;;Isi dengan corpus skripsimu;
+G040;;;;;;Isi dengan corpus skripsimu;
+G041;;;;;;Isi dengan corpus skripsimu;
+G042;;;;;;Isi dengan corpus skripsimu;
+G043;;;;;;Isi dengan corpus skripsimu;
+G044;;;;;;Isi dengan corpus skripsimu;
+G045;;;;;;Isi dengan corpus skripsimu;
+G046;;;;;;Isi dengan corpus skripsimu;
+G047;;;;;;Isi dengan corpus skripsimu;
+G048;;;;;;Isi dengan corpus skripsimu;
+G049;;;;;;Isi dengan corpus skripsimu;
+G050;;;;;;Isi dengan corpus skripsimu;
+G051;;;;;;Isi dengan corpus skripsimu;
+G052;;;;;;Isi dengan corpus skripsimu;
+G053;;;;;;Isi dengan corpus skripsimu;
+G054;;;;;;Isi dengan corpus skripsimu;
+G055;;;;;;Isi dengan corpus skripsimu;
+G056;;;;;;Isi dengan corpus skripsimu;
+G057;;;;;;Isi dengan corpus skripsimu;
+G058;;;;;;Isi dengan corpus skripsimu;
+G059;;;;;;Isi dengan corpus skripsimu;
+G060;;;;;;Isi dengan corpus skripsimu;
