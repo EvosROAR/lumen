@@ -110,7 +110,8 @@ export function getOpenAI() {
 
 export function chatModel() {
   if (process.env.OPENAI_CHAT_MODEL) return process.env.OPENAI_CHAT_MODEL;
-  if (usingGroq()) return "llama-3.1-8b-instant";
+  // 8B free-tier TPM is too small for RAG prompts + long answers.
+  if (usingGroq()) return "llama-3.3-70b-versatile";
   if (usingGemini()) return "gemini-flash-latest";
   return "gpt-4o-mini";
 }
@@ -118,11 +119,17 @@ export function chatModel() {
 export function chatModelCandidates(): string[] {
   const primary = chatModel();
   const extras = usingGroq()
-    ? ["llama-3.1-8b-instant", "llama-3.3-70b-versatile", "gemma2-9b-it"]
+    ? ["llama-3.3-70b-versatile"]
     : usingGemini()
       ? ["gemini-flash-latest", "gemini-3.5-flash", "gemini-2.0-flash"]
       : ["gpt-4o-mini", "gpt-4o"];
   return [...new Set([primary, ...extras])];
+}
+
+/** Groq counts max_tokens toward TPM. 8B on-demand is ~6000 TPM. */
+export function maxTokensForModel(model: string): number {
+  if (model.includes("8b") || model.includes("gemma")) return 1536;
+  return 4096;
 }
 
 export function embedProvider(): "local" | "api" {

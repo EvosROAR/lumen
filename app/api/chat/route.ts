@@ -8,6 +8,7 @@ import {
 import { buildChatHistory, selectMessagesForGeneration } from "@/lib/chat-history";
 import {
   chatModelCandidates,
+  maxTokensForModel,
   getChatClient,
   hasChatKey,
 } from "@/lib/openai";
@@ -395,7 +396,7 @@ Konteks: (kosong)`;
               model,
               stream: true,
               temperature: 0.2,
-              max_tokens: 8192,
+              max_tokens: maxTokensForModel(model),
               messages: chatMessages,
             }),
           { retries: 2, baseDelayMs: 1200 },

@@ -2,6 +2,7 @@ import {
   chatModel,
   chatModelCandidates,
   getChatClient,
+  maxTokensForModel,
 } from "@/lib/openai";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -28,6 +29,7 @@ async function completeOnce(prompt: string): Promise<string> {
           client.chat.completions.create({
             model: model || chatModel(),
             temperature: 0.2,
+            max_tokens: maxTokensForModel(model || chatModel()),
             messages: [
               {
                 role: "system",
