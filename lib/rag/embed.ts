@@ -1,4 +1,4 @@
-import { embedModel, embedProvider, getChatClient } from "@/lib/openai";
+import { embedModel, embedProvider, getEmbedClient } from "@/lib/openai";
 import { embedLocal, embedLocalMany } from "@/lib/rag/local-embed";
 import { withRetry } from "@/lib/retry";
 
@@ -23,7 +23,7 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
     return embedLocalMany(texts);
   }
 
-  const openai = getChatClient();
+  const openai = getEmbedClient();
   const response = await withRetry(
     () =>
       openai.embeddings.create({

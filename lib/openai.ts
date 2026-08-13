@@ -54,6 +54,55 @@ export function getChatClient() {
   });
 }
 
+/**
+ * Embedding client — separate from chat so Groq can stay for LLM while
+ * Gemini/OpenAI handle vectors (Groq has no embeddings API).
+ */
+export function getEmbedClient() {
+  const embedKey =
+    process.env.EMBED_API_KEY?.trim() ||
+    process.env.OPENAI_API_KEY?.trim() ||
+    "";
+  const embedBase =
+    process.env.EMBED_BASE_URL?.trim() ||
+    process.env.OPENAI_BASE_URL?.trim() ||
+    "";
+
+  if (!embedKey) {
+    throw new Error(
+      "EMBED_PROVIDER=api butuh EMBED_API_KEY (atau OPENAI_API_KEY). " +
+        "Groq tidak menyediakan embeddings. Ambil Gemini gratis di https://aistudio.google.com/apikey",
+    );
+  }
+
+  // Dedicated embed endpoint (recommended when chat uses Groq)
+  if (process.env.EMBED_BASE_URL?.trim()) {
+    return new OpenAI({
+      apiKey: embedKey,
+      baseURL: process.env.EMBED_BASE_URL.trim(),
+    });
+  }
+
+  // OPENAI_BASE_URL points at Gemini
+  if (embedBase.includes("generativelanguage.googleapis.com")) {
+    return new OpenAI({ apiKey: embedKey, baseURL: embedBase });
+  }
+
+  // Plain OpenAI embeddings
+  if (!usingGroq()) {
+    return new OpenAI({
+      apiKey: embedKey,
+      baseURL: embedBase || undefined,
+    });
+  }
+
+  // Chat is Groq but user set OPENAI_API_KEY for embeddings — default Gemini compat URL
+  return new OpenAI({
+    apiKey: embedKey,
+    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+  });
+}
+
 /** @deprecated use getChatClient */
 export function getOpenAI() {
   return getChatClient();
@@ -83,6 +132,17 @@ export function embedProvider(): "local" | "api" {
 
 export function embedModel() {
   if (process.env.OPENAI_EMBED_MODEL) return process.env.OPENAI_EMBED_MODEL;
+  const embedBase =
+    process.env.EMBED_BASE_URL?.trim() ||
+    process.env.OPENAI_BASE_URL?.trim() ||
+    "";
+  if (embedBase.includes("generativelanguage.googleapis.com")) {
+    return "gemini-embedding-001";
+  }
   if (usingGemini()) return "gemini-embedding-001";
+  // Default when chat=Groq and embed key is used without explicit base
+  if (usingGroq() && (process.env.EMBED_API_KEY || process.env.OPENAI_API_KEY)) {
+    return "gemini-embedding-001";
+  }
   return "text-embedding-3-small";
 }

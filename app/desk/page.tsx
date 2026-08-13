@@ -463,9 +463,9 @@ ${mapList}`;
     );
   }
 
-  const historyPanel = (
-    <Panel>
-      <div className="flex items-center justify-between gap-2">
+  const renderHistoryPanel = () => (
+    <Panel className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 items-center justify-between gap-2">
         <h2 className="font-[family-name:var(--font-display)] text-lg font-semibold">
           Riwayat
         </h2>
@@ -481,7 +481,7 @@ ${mapList}`;
           Chat baru
         </Btn>
       </div>
-      <ul className="mt-3 max-h-[55vh] space-y-1 overflow-y-auto pr-1">
+      <ul className="mt-3 min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain pr-1">
         {conversations.length === 0 && (
           <li className="rounded-xl bg-mist/70 px-3 py-3 text-xs text-ink-soft">
             Belum ada percakapan. Kirim pertanyaan pertama di panel chat.
@@ -532,9 +532,9 @@ ${mapList}`;
     </Panel>
   );
 
-  const libraryPanel = (
-    <div className="space-y-4">
-      <Panel>
+  const renderLibraryPanel = () => (
+    <div className="flex h-full min-h-0 flex-col gap-4">
+      <Panel className="shrink-0">
         <h2 className="font-[family-name:var(--font-display)] text-lg font-semibold">
           Pustaka
         </h2>
@@ -596,7 +596,7 @@ ${mapList}`;
               value={pasteBody}
               onChange={(e) => setPasteBody(e.target.value)}
               placeholder="Tempel kebijakan, runbook, catatan…"
-              rows={5}
+              rows={4}
               className="w-full resize-y rounded-xl border border-ink/10 bg-white/80 px-3 py-2 text-sm outline-none focus:border-teal/50"
             />
             <Btn
@@ -611,12 +611,12 @@ ${mapList}`;
         )}
       </Panel>
 
-      <Panel>
-        <div className="flex items-center justify-between gap-2">
+      <Panel className="flex min-h-0 flex-1 flex-col">
+        <div className="flex shrink-0 items-center justify-between gap-2">
           <h3 className="text-sm font-semibold text-ink">Dokumen terindeks</h3>
           <Badge>{docs.length}</Badge>
         </div>
-        <ul className="mt-3 max-h-[36vh] space-y-2 overflow-y-auto pr-1">
+        <ul className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-1">
           {docs.length === 0 && (
             <li className="rounded-xl bg-mist/70 px-3 py-3 text-xs text-ink-soft">
               Belum ada dokumen. Mulai dengan unggah atau muat contoh.
@@ -658,9 +658,9 @@ ${mapList}`;
     </div>
   );
 
-  const chatPanel = (
-    <section className="flex min-h-[70vh] flex-col rounded-2xl border border-ink/10 bg-white/65 backdrop-blur lg:min-h-[calc(100vh-7.5rem)]">
-      <div className="border-b border-ink/10 px-4 py-3 sm:px-5">
+  const renderChatPanel = () => (
+    <section className="flex h-full min-h-0 flex-col rounded-2xl border border-ink/10 bg-white/65 backdrop-blur">
+      <div className="shrink-0 border-b border-ink/10 px-4 py-3 sm:px-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="font-[family-name:var(--font-display)] text-lg font-semibold">
@@ -675,9 +675,9 @@ ${mapList}`;
         </div>
       </div>
 
-      <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
         {messages.length === 0 && (
-          <div className="animate-fade-up flex h-full min-h-[280px] flex-col items-center justify-center text-center">
+          <div className="animate-fade-up flex h-full min-h-[200px] flex-col items-center justify-center text-center">
             <p className="font-[family-name:var(--font-display)] text-2xl font-medium text-ink">
               Siap menjawab dari pustakamu
             </p>
@@ -761,7 +761,7 @@ ${mapList}`;
         <div ref={bottomRef} />
       </div>
 
-      <div className="border-t border-ink/10 p-4 sm:p-5">
+      <div className="shrink-0 border-t border-ink/10 p-4 sm:p-5">
         {status && (
           <p className="mb-3 text-xs text-ink-soft" role="status">
             {status}
@@ -798,25 +798,29 @@ ${mapList}`;
   );
 
   return (
-    <main className="min-h-screen pb-16 lg:pb-0">
-      <AppHeader
-        title="Knowledge Desk"
-        email={email}
-        trailing={
-          <>
-            {!demoMode && storage === "supabase" && <Badge tone="teal">Supabase</Badge>}
-            <Badge tone={configured ? "teal" : "warn"}>
-              {configured ? "Groq siap" : "Perlu GROQ_API_KEY"}
-            </Badge>
-            <Badge>
-              {docs.length} docs · {chunkCount} chunks
-            </Badge>
-          </>
-        }
-      />
+    <main className="flex h-[100dvh] flex-col overflow-hidden">
+      <div className="shrink-0">
+        <AppHeader
+          title="Knowledge Desk"
+          email={email}
+          trailing={
+            <>
+              {!demoMode && storage === "supabase" && (
+                <Badge tone="teal">Supabase</Badge>
+              )}
+              <Badge tone={configured ? "teal" : "warn"}>
+                {configured ? "Groq siap" : "Perlu GROQ_API_KEY"}
+              </Badge>
+              <Badge>
+                {docs.length} docs · {chunkCount} chunks
+              </Badge>
+            </>
+          }
+        />
+      </div>
 
       {/* Mobile panes */}
-      <div className="border-b border-ink/10 bg-white/40 px-4 py-2 lg:hidden">
+      <div className="shrink-0 border-b border-ink/10 bg-white/40 px-4 py-2 lg:hidden">
         <div className="mx-auto flex max-w-7xl gap-1">
           {(
             [
@@ -841,19 +845,18 @@ ${mapList}`;
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[300px_1fr]">
-        <aside className="hidden space-y-4 lg:block">
-          {historyPanel}
-          {libraryPanel}
-        </aside>
+      <div className="mx-auto grid min-h-0 w-full max-w-7xl flex-1 grid-cols-1 gap-4 overflow-hidden px-4 py-4 sm:px-6 lg:grid-cols-[240px_minmax(0,1fr)_260px] lg:gap-5 lg:py-4">
+        <aside className="hidden min-h-0 lg:block">{renderHistoryPanel()}</aside>
 
-        <div className="lg:hidden">
-          {mobilePane === "chat" && chatPanel}
-          {mobilePane === "library" && libraryPanel}
-          {mobilePane === "history" && historyPanel}
+        <div className="hidden min-h-0 lg:block">{renderChatPanel()}</div>
+
+        <aside className="hidden min-h-0 lg:block">{renderLibraryPanel()}</aside>
+
+        <div className="h-full min-h-0 lg:hidden">
+          {mobilePane === "chat" && renderChatPanel()}
+          {mobilePane === "library" && renderLibraryPanel()}
+          {mobilePane === "history" && renderHistoryPanel()}
         </div>
-
-        <div className="hidden lg:block">{chatPanel}</div>
       </div>
 
       <ConfirmModal
