@@ -1,5 +1,3 @@
-import { PDFParse } from "pdf-parse";
-
 const PAGE_MARK_RE = /^[\s\-–—]*\d+(\s*(of|\/|dari)\s*\d+)?[\s\-–—]*$/gim;
 
 function cleanPdfText(raw: string): string {
@@ -16,7 +14,12 @@ function isMostlyGarbage(text: string): boolean {
   return text.length < 80 || letters < 40;
 }
 
+/** Extract text from a PDF buffer (lazy-load pdf-parse for Vercel/serverless). */
 export async function extractPdfText(buffer: Buffer): Promise<string> {
+  // Worker must load before pdf-parse on serverless (Vercel).
+  await import("pdf-parse/worker");
+  const { PDFParse } = await import("pdf-parse");
+
   const parser = new PDFParse({ data: buffer });
   try {
     const result = await parser.getText();
