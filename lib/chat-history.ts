@@ -68,6 +68,40 @@ export function sanitizeHistoryContent(
   return text;
 }
 
+/** Assistant wrongly claimed an indexed doc was missing / unloadable. */
+export function isFalseLibraryRefusal(content: string): boolean {
+  const t = content.toLowerCase();
+  return (
+    /tidak tersedia/.test(t) ||
+    /belum (ter)?indeks/.test(t) ||
+    /pustaka terindeks/.test(t) ||
+    /silakan unggah/.test(t) ||
+    /tidak (dapat|bisa).{0,100}(menjelaskan|menjawab|menunjukkan)/.test(t) ||
+    /tidak memiliki informasi lebih lanjut/.test(t) ||
+    /file tersebut tidak ada di pustaka/.test(t)
+  );
+}
+
+/**
+ * Hybrid history policy:
+ * - With retrieval hits: use recent user questions only. Old assistant refusals in a
+ *   "broken" room must never override grounded context.
+ * - Without hits: drop false library-refusal assistant turns so the room can recover;
+ *   keep healthy assistant replies + user turns.
+ */
+export function selectMessagesForGeneration(
+  messages: { role: string; content: string }[],
+  hasContext: boolean,
+): { role: string; content: string }[] {
+  if (hasContext) {
+    return messages.filter((m) => m.role === "user").slice(-4);
+  }
+
+  return messages.filter(
+    (m) => !(m.role === "assistant" && isFalseLibraryRefusal(m.content)),
+  );
+}
+
 export function buildChatHistory(
   messages: { role: string; content: string }[],
   limit = 8,

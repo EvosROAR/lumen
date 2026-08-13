@@ -5,14 +5,19 @@ import {
   createConversation,
   touchConversationTitle,
 } from "@/lib/conversations";
-import { buildChatHistory } from "@/lib/chat-history";
+import { buildChatHistory, selectMessagesForGeneration } from "@/lib/chat-history";
 import {
   chatModelCandidates,
   getChatClient,
   hasChatKey,
 } from "@/lib/openai";
 import { insertQueryLog } from "@/lib/query-logs";
-import { buildContext, retrieve } from "@/lib/rag/retrieve";
+import {
+  buildContext,
+  resolveQueryHints,
+  retrieve,
+} from "@/lib/rag/retrieve";
+import { readStore } from "@/lib/rag/store";
 import {
   friendlyApiError,
   getErrorStatus,
@@ -80,14 +85,80 @@ export async function POST(request: Request) {
 
     const totalStarted = Date.now();
     const retrieveStarted = Date.now();
+
+    const storePreview = await readStore(auth.user.id, auth.supabase);
+    const libraryNames = storePreview.documents.map((d) => d.filename);
+    const historyTexts = messages
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .slice(-8)
+      .map((m) => m.content);
+    const { retrievalQuery, hintFilenames } = resolveQueryHints(
+      lastUser.content,
+      historyTexts,
+      libraryNames,
+    );
+
     const { hits, citations, availableFilenames, mentionedFilenames } =
-      await retrieve(lastUser.content, {
-        topK: 4,
+      await retrieve(retrievalQuery, {
+        topK: hintFilenames.length > 0 ? 8 : 6,
         mode: "hybrid",
         userId: auth.user.id,
         supabase: auth.supabase,
+        hintFilenames,
       });
     const retrieveMs = Date.now() - retrieveStarted;
+
+    // File is in library but has zero searchable chunks — don't let the LLM contradict itself.
+    const targetedFiles = [
+      ...new Set([...hintFilenames, ...mentionedFilenames]),
+    ].filter((f) =>
+      availableFilenames.some((a) => a.toLowerCase() === f.toLowerCase()),
+    );
+    if (hits.length === 0 && targetedFiles.length > 0) {
+      const hasChunks = storePreview.chunks.some((c) =>
+        targetedFiles.some((f) => f.toLowerCase() === c.filename.toLowerCase()),
+      );
+      const fixed = hasChunks
+        ? `File ${targetedFiles.join(", ")} ada di pustaka, tetapi cuplikan relevan gagal diambil. Coba sebut nama file lengkap, atau hapus lalu unggah ulang dokumen itu.`
+        : `File ${targetedFiles.join(", ")} tercatat di pustaka, tetapi isi teksnya belum terindeks (chunk kosong). Hapus file itu di pustaka, unggah ulang, lalu tanya lagi.`;
+
+      await appendMessage(
+        auth.user.id,
+        conversationId,
+        { role: "assistant", content: fixed },
+        auth.supabase,
+      );
+
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          const send = (payload: unknown) => {
+            controller.enqueue(
+              encoder.encode(`${JSON.stringify(payload)}\n`),
+            );
+          };
+          send({ type: "meta", conversationId, retrieveMs });
+          send({ type: "token", token: fixed });
+          send({
+            type: "done",
+            conversationId,
+            latency: {
+              retrieveMs,
+              generateMs: 0,
+              totalMs: Date.now() - totalStarted,
+            },
+          });
+          controller.close();
+        },
+      });
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "application/x-ndjson; charset=utf-8",
+          "Cache-Control": "no-cache, no-transform",
+        },
+      });
+    }
+
     const context = buildContext(hits);
 
     const libraryList =
@@ -108,15 +179,33 @@ export async function POST(request: Request) {
       ),
     ];
 
-    const system = `Kamu adalah Lumen, asisten knowledge desk.
+    const hasContext = hits.length > 0;
+    const system = hasContext
+      ? `Kamu adalah Lumen, asisten knowledge desk.
 Jawab dalam bahasa yang sama dengan pertanyaan user (umumnya Bahasa Indonesia).
-Gunakan HANYA konteks sumber di bawah. Jangan mengarang isi file yang tidak ada di konteks.
 
-Aturan jawaban:
-- Jawab singkat, jelas, maksimal 2–4 paragraf. JANGAN mengulang kalimat yang sama.
-- Jika konteks cukup: jawab langsung + rujukan [Sumber 1], [Sumber 2].
-- Jika user menanyakan file tertentu yang TIDAK ada di pustaka atau tidak ada di konteks: katakan sekali saja bahwa file itu tidak tersedia di pustaka terindeks, sebutkan file yang tersedia, lalu berhenti. Jangan mengulang permintaan maaf.
-- Jika konteks kosong/tidak relevan: akui keterbatasan sekali, sarankan unggah/indeks dokumen yang dimaksud, lalu berhenti.
+STATUS WAJIB: Ada ${hits.length} cuplikan relevan di bawah. Dokumen SUDAH terindeks dan tersedia.
+- WAJIB menjawab/meringkas dari Konteks. Sertakan rujukan [Sumber 1], [Sumber 2], dst.
+- DILARANG bilang file tidak ada, tidak tersedia, belum terindeks, atau minta user mengunggah ulang file yang sudah ada di Konteks.
+- Abaikan riwayat yang pernah menolak dokumen ini secara salah.
+- Jawab singkat, jelas, maksimal 2–4 paragraf. Jangan mengarang di luar Konteks.
+
+Konteks:
+${context}
+${
+  mentionedFilenames.length > 0
+    ? `\nFile yang dimaksud user: ${mentionedFilenames.join(", ")}.`
+    : ""
+}`
+      : `Kamu adalah Lumen, asisten knowledge desk.
+Jawab dalam bahasa yang sama dengan pertanyaan user (umumnya Bahasa Indonesia).
+Tidak ada cuplikan relevan di Konteks untuk pertanyaan ini. Jangan mengarang isi file.
+
+Aturan:
+- Jawab singkat. Jangan mengulang kalimat yang sama.
+- Jika user menyebut file yang TIDAK ada di daftar pustaka: katakan sekali file itu belum terindeks, sebutkan file tersedia, lalu berhenti.
+- Jika file ADA di daftar pustaka: JANGAN bilang file tidak ada. Katakan cuplikan relevan belum tertarik; minta nama file lengkap atau pertanyaan lebih spesifik.
+- Jika pustaka kosong: sarankan unggah dokumen.
 
 Dokumen terindeks di pustaka pengguna:
 ${libraryList}
@@ -128,12 +217,13 @@ ${
       : ""
 }
 
-${context ? `Konteks:\n${context}` : "Konteks: (kosong — belum ada dokumen relevan untuk pertanyaan ini)"}`;
+Konteks: (kosong)`;
 
+    const historySource = selectMessagesForGeneration(messages, hasContext);
     const client = getChatClient();
     const chatMessages = [
       { role: "system" as const, content: system },
-      ...buildChatHistory(messages, 8),
+      ...buildChatHistory(historySource, 8),
     ];
 
     let completion: Awaited<

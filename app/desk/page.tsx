@@ -5,6 +5,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Badge, Btn, Panel, ScoreBar } from "@/components/ui";
 import { readJsonResponse } from "@/lib/http";
+import { isFalseLibraryRefusal } from "@/lib/chat-history";
 import type { Citation, ConversationMeta, DocumentMeta } from "@/lib/types";
 
 type MobilePane = "chat" | "library" | "history";
@@ -349,15 +350,32 @@ ${mapList}`;
     setStatus(null);
 
     try {
+      // Broken rooms: old false refusals poison the model. Send user turns only
+      // (like a new chat) while keeping the same conversationId for history UI.
+      const threadPoisoned = messages.some(
+        (m) => m.role === "assistant" && isFalseLibraryRefusal(m.content),
+      );
+      const payloadMessages = threadPoisoned
+        ? [...messages.filter((m) => m.role === "user"), userMsg]
+            .slice(-4)
+            .map((m) => ({ role: m.role, content: m.content }))
+        : nextMessages.map((m) => ({
+            role: m.role,
+            content: m.content,
+          }));
+
+      if (threadPoisoned) {
+        setStatus(
+          "Riwayat tolakan di chat ini diabaikan supaya jawaban bisa akurat.",
+        );
+      }
+
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversationId: conversationId || undefined,
-          messages: nextMessages.map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
+          messages: payloadMessages,
         }),
       });
 

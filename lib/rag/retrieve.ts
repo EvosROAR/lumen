@@ -41,7 +41,7 @@ function rescaleTopScores(hits: RetrievedChunk[]): RetrievedChunk[] {
   }));
 }
 
-/** Match query against indexed filenames (e.g. "baca Akun Surg.txt"). */
+/** Match query against indexed filenames (e.g. "baca Akun Surg.txt" or "project plan"). */
 export function matchMentionedFilenames(
   query: string,
   filenames: string[],
@@ -57,6 +57,63 @@ export function matchMentionedFilenames(
     }
   }
 
+  // Partial title: "project plan" → "Project Plan - Aplikasi ERP….pdf"
+  const stop = new Set([
+    "dokumen",
+    "document",
+    "file",
+    "yang",
+    "itu",
+    "ini",
+    "tsb",
+    "tersebut",
+    "bisa",
+    "tolong",
+    "mohon",
+    "jelaskan",
+    "menjelaskan",
+    "rinci",
+    "secara",
+    "kepada",
+    "saya",
+    "apa",
+    "isi",
+    "ada",
+    "dengan",
+    "dari",
+    "untuk",
+    "the",
+    "and",
+    "pdf",
+    "txt",
+    "md",
+  ]);
+  const significant = (text: string) =>
+    text
+      .toLowerCase()
+      .replace(/\.[^.]+$/, "")
+      .split(/[^a-z0-9]+/i)
+      .filter((t) => t.length >= 4 && !stop.has(t));
+
+  for (const name of filenames) {
+    if (matched.has(name)) continue;
+    const tokens = significant(name);
+    const hits = tokens.filter((t) => q.includes(t));
+    if (hits.length >= 2) {
+      matched.add(name);
+      continue;
+    }
+    if (hits.length === 1 && hits[0].length >= 5) {
+      const tok = hits[0];
+      const unique = !filenames.some(
+        (f) =>
+          f !== name &&
+          significant(f).includes(tok),
+      );
+      if (unique) matched.add(name);
+    }
+  }
+
   // Also catch bare "something.txt" patterns even if not in store
   const extHits = query.match(/[\w.\- ()]+\.(txt|md|pdf)/gi) ?? [];
   for (const hit of extHits) {
@@ -69,11 +126,66 @@ export function matchMentionedFilenames(
   return [...matched];
 }
 
+const DEIXIS_RE =
+  /\b(tsb\.?|tersebut|yang\s+tadi)\b/i;
+
+/** When user says "dokumen tsb" / "project plan itu", pull filenames from query + history. */
+export function resolveQueryHints(
+  query: string,
+  historyTexts: string[],
+  availableFilenames: string[],
+): { retrievalQuery: string; hintFilenames: string[] } {
+  const direct = matchMentionedFilenames(query, availableFilenames);
+  if (direct.length > 0) {
+    return {
+      retrievalQuery: `${query}\n${direct.join(" ")}`,
+      hintFilenames: direct,
+    };
+  }
+
+  const fromHistory: string[] = [];
+  const seen = new Set<string>();
+  for (const text of historyTexts) {
+    for (const name of matchMentionedFilenames(text, availableFilenames)) {
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      fromHistory.push(name);
+    }
+  }
+
+  const asksAboutDoc =
+    DEIXIS_RE.test(query) ||
+    /\b(dokumen|file|pdf)\b/i.test(query) ||
+    /\b(isi|jelaskan|menjelaskan|rangkum|ringkas|rinci)\b/i.test(query);
+
+  if (fromHistory.length > 0 && asksAboutDoc) {
+    return {
+      retrievalQuery: `${query}\n${fromHistory.join(" ")}`,
+      hintFilenames: fromHistory,
+    };
+  }
+
+  if (
+    availableFilenames.length === 1 &&
+    /\b(dokumen|file|pdf)\b/i.test(query)
+  ) {
+    return {
+      retrievalQuery: `${query}\n${availableFilenames[0]}`,
+      hintFilenames: availableFilenames,
+    };
+  }
+
+  return { retrievalQuery: query, hintFilenames: [] };
+}
+
 export type RetrieveOptions = {
   topK?: number;
   mode?: RetrievalMode;
   userId: string;
   supabase?: SupabaseClient;
+  /** Extra filenames to scope (e.g. resolved from "dokumen tsb"). */
+  hintFilenames?: string[];
 };
 
 export async function retrieve(
@@ -89,7 +201,14 @@ export async function retrieve(
   const mode = options.mode ?? "hybrid";
   const store = await readStore(options.userId, options.supabase);
   const availableFilenames = store.documents.map((d) => d.filename);
-  const mentionedFilenames = matchMentionedFilenames(query, availableFilenames);
+  const mentionedFilenames = [
+    ...new Set([
+      ...matchMentionedFilenames(query, availableFilenames),
+      ...(options.hintFilenames ?? []).filter((f) =>
+        availableFilenames.some((a) => a.toLowerCase() === f.toLowerCase()),
+      ),
+    ]),
+  ];
 
   if (store.chunks.length === 0) {
     return {
@@ -142,7 +261,7 @@ export async function retrieve(
   const normVector = normalizeMap(vectorScores);
   const normLexical = normalizeMap(lexicalScores);
 
-  const ranked: RetrievedChunk[] = rescaleTopScores(
+  let ranked: RetrievedChunk[] = rescaleTopScores(
     chunks
       .map((chunk) => {
         const v = normVector.get(chunk.id) || 0;
@@ -155,8 +274,18 @@ export async function retrieve(
       })
       .sort((a, b) => b.score - a.score)
       .slice(0, topK)
-      .filter((hit) => hit.score > 0.08),
+      // When a file is explicitly targeted, keep top chunks even if absolute scores are low.
+      .filter((hit) => (mentionedSet.size > 0 ? true : hit.score > 0.08)),
   );
+
+  // Named/hinted file exists but ranking empty — use leading chunks of that file.
+  if (ranked.length === 0 && mentionedSet.size > 0) {
+    ranked = chunks
+      .filter((c) => mentionedSet.has(c.filename.toLowerCase()))
+      .sort((a, b) => a.index - b.index)
+      .slice(0, topK)
+      .map((chunk, i) => ({ ...chunk, score: Math.max(0.5, 1 - i * 0.05) }));
+  }
 
   const citations: Citation[] = ranked.map((hit) => ({
     documentId: hit.documentId,
