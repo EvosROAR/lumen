@@ -11,19 +11,26 @@ export function hasOpenAIKey() {
   return hasChatKey();
 }
 
-function usingGroq() {
+function chatProvider(): "groq" | "gemini" | "openai" {
+  const explicit = (process.env.AI_CHAT_PROVIDER || "").trim().toLowerCase();
+  if (explicit === "gemini" || explicit === "google") return "gemini";
+  if (explicit === "openai") return "openai";
+  if (explicit === "groq") return "groq";
+
   const base = process.env.OPENAI_BASE_URL || "";
-  return (
-    Boolean(process.env.GROQ_API_KEY?.trim()) ||
-    base.includes("api.groq.com") ||
-    process.env.AI_CHAT_PROVIDER === "groq"
-  );
+  if (base.includes("generativelanguage.googleapis.com")) return "gemini";
+  if (base.includes("api.groq.com") || process.env.GROQ_API_KEY?.trim()) {
+    return "groq";
+  }
+  return "openai";
+}
+
+function usingGroq() {
+  return chatProvider() === "groq";
 }
 
 function usingGemini() {
-  return (process.env.OPENAI_BASE_URL || "").includes(
-    "generativelanguage.googleapis.com",
-  );
+  return chatProvider() === "gemini";
 }
 
 export function getChatClient() {
@@ -44,13 +51,19 @@ export function getChatClient() {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
     throw new Error(
-      "OPENAI_API_KEY belum di-set. Salin .env.example ke .env.local lalu isi API key-mu.",
+      usingGemini()
+        ? "AI_CHAT_PROVIDER=gemini butuh OPENAI_API_KEY (key Gemini dari https://aistudio.google.com/apikey)."
+        : "OPENAI_API_KEY belum di-set. Salin .env.example ke .env.local lalu isi API key-mu.",
     );
   }
 
   return new OpenAI({
     apiKey,
-    baseURL: process.env.OPENAI_BASE_URL || undefined,
+    baseURL:
+      process.env.OPENAI_BASE_URL?.trim() ||
+      (usingGemini()
+        ? "https://generativelanguage.googleapis.com/v1beta/openai/"
+        : undefined),
   });
 }
 
